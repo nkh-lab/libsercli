@@ -14,13 +14,16 @@
 #include <atomic>
 #include <map>
 #include <thread>
+#include <mutex>
 
 #include "sercli/IServer.h"
 
 namespace nkhlab {
 namespace sercli {
 
-class SocketClientHandler : public IClientHandler
+class SocketClientHandler
+    : public IClientHandler
+    , public std::enable_shared_from_this<SocketClientHandler>
 {
 public:
     SocketClientHandler(int client_socket);
@@ -32,11 +35,14 @@ public:
     bool Send(const std::vector<uint8_t>& data) override;
     bool SubscribeToReceive(ServerDataReceivedCb data_received_cb) override;
     void Disconnected();
+    void OnReceive(const std::vector<uint8_t>& data);
 
 private:
+    std::mutex mutex_;
     int client_socket_;
     std::string id_;
     bool connected_;
+    ServerDataReceivedCb data_received_cb_;
 };
 
 using SocketClientHandlerPtr = std::shared_ptr<SocketClientHandler>;

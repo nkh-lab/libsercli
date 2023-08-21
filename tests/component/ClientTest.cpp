@@ -25,8 +25,17 @@ int main(int argc, char const* argv[])
 
     if (client->Connect(server_disconnected_cb, nullptr))
     {
-        int in;
-        std::cin >> in;
+        // Create a vector to store the uint8_t values
+        std::vector<uint8_t> byteVector;
+
+        // Read bytes from std::cin until the end of input (Ctrl+D on Unix, Ctrl+Z on Windows)
+        uint8_t byte;
+        while (std::cin.read(reinterpret_cast<char*>(&byte), sizeof(byte)))
+        {
+            byteVector.push_back(byte);
+        }
+
+        client->Send(byteVector);
 
         client->Disconnect();
     }

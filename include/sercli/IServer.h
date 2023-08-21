@@ -20,9 +20,10 @@ namespace nkhlab {
 namespace sercli {
 
 class IClientHandler;
+using IClientHandlerPtr = std::shared_ptr<IClientHandler>;
 
 using ServerDataReceivedCb =
-    std::function<void(IClientHandler& client, const std::vector<uint8_t>& data)>;
+    std::function<void(IClientHandlerPtr client, const std::vector<uint8_t>& data)>;
 
 class IClientHandler
 {
@@ -36,7 +37,6 @@ public:
     virtual bool SubscribeToReceive(ServerDataReceivedCb data_received_cb) = 0;
 };
 
-using IClientHandlerPtr = std::shared_ptr<IClientHandler>;
 using ClientStatusCb = std::function<void(IClientHandlerPtr client, bool connected)>;
 
 class IServer

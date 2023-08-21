@@ -25,7 +25,6 @@ SocketClientHandler::SocketClientHandler(int client_socket)
     : client_socket_{client_socket}
     , id_{std::to_string(client_socket)}
     , connected_{true}
-
 {
 }
 
@@ -36,21 +35,43 @@ const std::string& SocketClientHandler::SocketClientHandler::GetId()
 
 bool SocketClientHandler::IsConnected()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     return connected_;
 }
 
 bool SocketClientHandler::Send(const std::vector<uint8_t>& data)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     if (!connected_) return false;
 
     return true;
 }
 
+void SocketClientHandler::Disconnected()
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    connected_ = false;
+}
+
 bool SocketClientHandler::SubscribeToReceive(ServerDataReceivedCb data_received_cb)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     if (!connected_) return false;
 
+    data_received_cb_ = data_received_cb;
+
     return true;
+}
+
+void SocketClientHandler::OnReceive(const std::vector<uint8_t>& data)
+{
+    if (!data_received_cb_) return;
+
+    data_received_cb_(shared_from_this(), data);
 }
 
 SocketServer::SocketServer(const std::string& unix_socket_path)
@@ -114,7 +135,6 @@ bool SocketServer::Start(ClientStatusCb client_status_cb)
 
     stopped_ = false;
     worker_thread_ = std::thread([&, server_socket, epoll_fd, client_status_cb]() {
-
         epoll_event server_event;
         server_event.data.fd = server_socket;
         server_event.events = EPOLLIN;
@@ -156,7 +176,8 @@ bool SocketServer::Start(ClientStatusCb client_status_cb)
                     auto client_pair = clients_.emplace(
                         client_socket, std::make_shared<SocketClientHandler>(client_socket));
 
-                    if (client_status_cb) client_status_cb(client_pair.first->second, true);
+                    SocketClientHandlerPtr& client = client_pair.first->second;
+                    if (client_status_cb) client_status_cb(client, true);
                 }
                 else
                 {
@@ -164,12 +185,19 @@ bool SocketServer::Start(ClientStatusCb client_status_cb)
                     client_socket = events[i].data.fd;
                     constexpr size_t RECEIVER_BUFFER_SIZE = 1024; // TODO: configurable?
                     std::vector<uint8_t> buffer(RECEIVER_BUFFER_SIZE);
+                    SocketClientHandlerPtr& client = clients_.at(client_socket);
 
                     int bytes_read = read(client_socket, buffer.data(), RECEIVER_BUFFER_SIZE);
                     if (bytes_read == 0)
                     {
                         // Client disconnected
-                        if (client_status_cb) client_status_cb(clients_.at(client_socket), false);
+                        client->Disconnected();
+                        if (client_status_cb) client_status_cb(client, false);
+                        clients_.erase(client_socket);
+
+                        // Handle the disconnection
+                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_socket, nullptr);
+                        close(client_socket);
                     }
                     else if (bytes_read < 0)
                     {
@@ -178,6 +206,7 @@ bool SocketServer::Start(ClientStatusCb client_status_cb)
                     else
                     {
                         // Handle received data
+                        client->OnReceive(buffer);
                     }
                 }
             }

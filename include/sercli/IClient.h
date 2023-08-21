@@ -31,7 +31,7 @@ public:
         ClientDataReceivedCb data_received_cb) = 0;
     virtual void Disconnect() = 0;
 
-    virtual void Send(const std::vector<uint8_t>& data) = 0;
+    virtual bool Send(const std::vector<uint8_t>& data) = 0;
 };
 
 } // namespace sercli

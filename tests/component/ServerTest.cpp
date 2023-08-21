@@ -23,7 +23,16 @@ int main(int argc, char const* argv[])
 
     ClientStatusCb client_status_cb = [](IClientHandlerPtr client, bool connected) {
         if (connected)
+        {
             std::cout << "Client with ID: " << client->GetId() << " connected\n";
+
+            client->SubscribeToReceive([](IClientHandlerPtr client, const std::vector<uint8_t>& data) {
+                std::string data_str{data.begin(), data.end()};
+
+                std::cout << "Client with ID: " << client->GetId() << " sent data: " << data_str
+                          << "\n";
+            });
+        }
         else
             std::cout << "Client with ID: " << client->GetId() << " diconnected\n";
     };

@@ -23,6 +23,10 @@
 namespace nkhlab {
 namespace sercli {
 
+// To be able to recognize a client disconnection on a server side,
+// when the client sends and disconnects immediately
+constexpr std::chrono::milliseconds kWaitBeforeDisconnect{10};
+
 class SocketClient : public IClient
 {
 public:
@@ -32,7 +36,7 @@ public:
     bool Connect(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb) override;
     void Disconnect() override;
 
-    void Send(const std::vector<uint8_t>& data) override;
+    bool Send(const std::vector<uint8_t>& data) override;
 
 private:
     bool is_unix_;

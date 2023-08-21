@@ -61,11 +61,18 @@ bool SocketClient::Connect(ServerDisconnectedCb server_disconnected_cb, ClientDa
 
 void SocketClient::Disconnect()
 {
+    std::this_thread::sleep_for(kWaitBeforeDisconnect);
     close(client_socket_);
 }
 
-void SocketClient::Send(const std::vector<uint8_t>& data)
+bool SocketClient::Send(const std::vector<uint8_t>& data)
 {
+    // Send the message to the server using write()
+    ssize_t bytes_written = write(client_socket_, data.data(), data.size());
+
+    if (bytes_written == -1 || (static_cast<size_t>(bytes_written) != data.size())) return false;
+
+    return true;
 }
 
 } // namespace sercli
