@@ -9,11 +9,50 @@
  * but WITHOUT ANY WARRANTY.
  */
 
+#include <algorithm>
 #include <iostream>
+#include <sstream>
 
+#include "cpp-utils/StringHelper.h"
 #include "sercli/ClientBuilder.h"
 
+using namespace nkhlab::cpputils;
 using namespace nkhlab::sercli;
+
+//
+// Command format
+// q
+// q:
+// s:<data to send>
+// s,n10,t100ms:<data to send>
+//
+bool HandleCommand(const std::string& in, IClient* client)
+{
+    bool ret_quit = false;
+
+    std::vector<std::string> command_data = StringHelper::SplitStr(in, ":");
+
+    if (command_data.size() > 0)
+    {
+        if (command_data[0] == "q")
+            ret_quit = true; // Quit
+        else
+        {
+            std::vector<std::string> commands = StringHelper::SplitStr(command_data[0], ",");
+
+            if (commands[0] == "s") // Send
+            {
+                if (commands.size() == 1)
+                {
+                    std::vector<uint8_t> data(command_data[1].begin(), command_data[1].end());
+                    client->Send(data);
+                }
+            }
+        }
+    }
+
+    return ret_quit;
+}
 
 int main(int argc, char const* argv[])
 {
@@ -25,17 +64,14 @@ int main(int argc, char const* argv[])
 
     if (client->Connect(server_disconnected_cb, nullptr))
     {
-        // Create a vector to store the uint8_t values
-        std::vector<uint8_t> byteVector;
-
-        // Read bytes from std::cin until the end of input (Ctrl+D on Unix, Ctrl+Z on Windows)
-        uint8_t byte;
-        while (std::cin.read(reinterpret_cast<char*>(&byte), sizeof(byte)))
+        for (;;)
         {
-            byteVector.push_back(byte);
-        }
+            std::string in;
 
-        client->Send(byteVector);
+            std::getline(std::cin, in);
+
+            if (HandleCommand(in, client.get())) break;
+        }
 
         client->Disconnect();
     }

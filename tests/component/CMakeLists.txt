@@ -13,10 +13,12 @@ add_executable(ServerTest ServerTest.cpp)
 
 target_link_libraries(ServerTest
     PRIVATE libsercli
+    PRIVATE libcpputils
     )
 
 add_executable(ClientTest ClientTest.cpp)
 
 target_link_libraries(ClientTest
     PRIVATE libsercli
+    PRIVATE libcpputils
     )
