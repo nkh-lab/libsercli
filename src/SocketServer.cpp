@@ -16,8 +16,6 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include <iostream> // TODO
-
 namespace nkhlab {
 namespace sercli {
 
@@ -46,6 +44,10 @@ bool SocketClientHandler::Send(const std::vector<uint8_t>& data)
 
     if (!connected_) return false;
 
+    ssize_t bytes_written = write(client_socket_, data.data(), data.size());
+
+    if (bytes_written == -1 || (static_cast<size_t>(bytes_written) != data.size())) return false;
+
     return true;
 }
 
@@ -70,6 +72,8 @@ bool SocketClientHandler::SubscribeToReceive(ServerDataReceivedCb data_received_
 void SocketClientHandler::OnReceive(const std::vector<uint8_t>& data)
 {
     if (!data_received_cb_) return;
+
+    std::lock_guard<std::mutex> lock(mutex_);
 
     data_received_cb_(shared_from_this(), data);
 }

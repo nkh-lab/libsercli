@@ -23,15 +23,12 @@
 namespace nkhlab {
 namespace sercli {
 
-// To be able to recognize a client disconnection on a server side,
-// when the client sends and disconnects immediately
-constexpr std::chrono::milliseconds kWaitBeforeDisconnect{10};
-
 class SocketClient : public IClient
 {
 public:
     SocketClient(const std::string& unix_socket);
     SocketClient(const std::string& inet_address, int port);
+    ~SocketClient();
 
     bool Connect(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb) override;
     void Disconnect() override;
@@ -42,6 +39,8 @@ private:
     bool is_unix_;
     std::string unix_socket_path_;
     int client_socket_;
+    std::thread worker_thread_;
+    std::atomic_bool disconnected_;
 };
 
 } // namespace sercli
