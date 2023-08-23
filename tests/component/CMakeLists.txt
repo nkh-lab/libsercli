@@ -9,6 +9,8 @@
 # but WITHOUT ANY WARRANTY.
 #
 
+add_subdirectory(cpp-utils)
+
 add_executable(ServerTest ServerTest.cpp)
 
 target_link_libraries(ServerTest
