@@ -1,0 +1,35 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "ServerTest",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/component/interactive/ServerTest",
+            "cwd": "${workspaceFolder}/build/tests/component/interactive",
+            "externalConsole": false
+        },
+
+        {
+            "name": "ClientTest",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/component/interactive/ClientTest",
+            "cwd": "${workspaceFolder}/build/tests/component/interactive",
+            "externalConsole": false
+        },
+
+        {
+            "name": "libinterutils-unit-tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/component/interactive/utils/tests/unit/libinterutils-unit-tests",
+            "cwd": "${workspaceFolder}/build/tests/component/interactive/utils/tests/unit",
+            "externalConsole": false
+        },
+    ]
+}

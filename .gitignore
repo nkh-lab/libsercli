@@ -14,22 +14,8 @@
 
 # Folders
 build/
+out/
 temp/
-
-# AndroidStudio #
-
-# Files
-*.iml
-local.properties
-
-# Folders
-.cxx/
-.DS_Store/
-.externalNativeBuild/
-.gradle/
-.idea/
-build/
-captures/
 
 # VisualStudioCode #
 
@@ -38,4 +24,12 @@ captures/
 
 # Folders
 .settings/
-.vscode/
+.vscode/*
+
+# Exclude
+!.vscode/launch.json
+
+# Project specific #
+
+# Folders
+prebuilt/

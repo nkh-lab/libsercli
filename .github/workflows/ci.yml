@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [ '**' ]
+
+jobs:
+  Build-on-Ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libgtest-dev libgmock-dev
+      - name: Build
+        run: |
+          mkdir build && cd build
+          cmake ..
+          make
+      - name: Build with Tests
+        run: |
+          cd build && rm -rf *
+          cmake -Dlibsercli_BUILD_CTESTS=ON -Dlibsercli_BUILD_UTESTS=ON ..
+          make
+      - name: Run Unit Tests
+        run: |
+          build/tests/component/interactive/utils/tests/unit/libinterutils-unit-tests
