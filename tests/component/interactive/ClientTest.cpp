@@ -14,16 +14,16 @@
 #include <sstream>
 #include <thread>
 
-#include "cpp-utils/StringHelper.h"
+#include "CommandHelper.h"
 #include "sercli/ClientBuilder.h"
 
-using namespace nkhlab::cpputils;
 using namespace nkhlab::sercli;
+using namespace nkhlab::sercli::tests;
 
-void HandleSendCommand(IClient* client, const std::vector<uint8_t>& data, size_t nums, size_t delay_ms)
+void HandleSendCommand(IClient* client, const std::vector<uint8_t>& data, int nums, int delay_ms)
 {
     std::cout << "Sending...\n";
-    for (size_t i = 0; i < nums; ++i)
+    for (int i = 0; i < nums; ++i)
     {
         if (!client->Send(data))
         {
@@ -34,20 +34,6 @@ void HandleSendCommand(IClient* client, const std::vector<uint8_t>& data, size_t
             std::this_thread::sleep_for(std::chrono::milliseconds{delay_ms});
     }
     std::cout << "Done!\n";
-}
-
-void RetrieveNumsAndDelayFromSendCommand(const std::string& send_command, size_t& ret_nums, size_t& ret_delay_ms)
-{
-    ret_nums = 1;
-    ret_delay_ms = 0;
-
-    std::vector<std::string> sub_commands = StringHelper::SplitStr(send_command, ",");
-
-    for (auto s : sub_commands)
-    {
-        if (*s.begin() == 'n') ret_nums = std::stoi(s.substr(1));
-        if (*s.begin() == 'd') ret_delay_ms = std::stoi(s.substr(1));
-    }
 }
 
 //
@@ -61,27 +47,41 @@ bool HandleCommand(const std::string& in, IClient* client)
 {
     bool ret_quit = false;
 
-    std::vector<std::string> command_data = StringHelper::SplitStr(in, ":");
+    std::string command, data;
+    std::map<std::string, int> args;
+    bool parsing_res;
 
-    if (command_data.size() > 0)
+    parsing_res = CommandHelper::ParseCommand(in, command, data, args);
+
+    if (parsing_res)
     {
-        if (command_data[0] == "q") // Quit
+        if (command == "q") // Quit
         {
             ret_quit = true;
         }
-        else if (command_data[0][0] == 's') // Send
+        else if (command == "s" && !data.empty()) // Send
         {
-            if (command_data[1].size() > 0)
+            int nums = 1, delay_ms = 0;
+
+            try
             {
-                std::vector<uint8_t> data(command_data[1].begin(), command_data[1].end());
-
-                size_t nums;
-                size_t delay_ms;
-
-                RetrieveNumsAndDelayFromSendCommand(command_data[0], nums, delay_ms);
-
-                HandleSendCommand(client, data, nums, delay_ms);
+                nums = args.at("n");
             }
+            catch (...)
+            {
+            }
+
+            try
+            {
+                delay_ms = args.at("d");
+            }
+            catch (...)
+            {
+            }
+
+            std::vector<uint8_t> bytes(data.begin(), data.end());
+
+            HandleSendCommand(client, bytes, nums, delay_ms);
         }
     }
 

@@ -9,4 +9,18 @@
 # but WITHOUT ANY WARRANTY.
 #
 
-add_subdirectory(interactive)
+find_package(GTest REQUIRED)
+
+file(GLOB SRC_FILES
+    "*.cpp"
+    )
+
+add_executable(libinterutils-unit-tests
+    ${SRC_FILES}
+    )
+
+target_link_libraries(libinterutils-unit-tests
+    PRIVATE GTest::Main
+    PRIVATE gmock
+    PRIVATE libinterutils
+    )

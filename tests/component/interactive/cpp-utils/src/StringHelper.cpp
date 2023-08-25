@@ -26,6 +26,7 @@ namespace cpputils {
 std::vector<std::string> StringHelper::SplitStr(
     const std::string& input,
     const std::string& delimiter,
+    bool only_first,
     bool skip_empty)
 {
     std::vector<std::string> strings;
@@ -38,6 +39,8 @@ std::vector<std::string> StringHelper::SplitStr(
         start = end + delimiter.length();
 
         (skip_empty && sub_str.size() == 0) ? void() : strings.push_back(sub_str);
+
+        if (only_first) break;
     }
 
     // Add the last substring after the last delimiter

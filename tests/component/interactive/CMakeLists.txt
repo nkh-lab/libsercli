@@ -9,4 +9,19 @@
 # but WITHOUT ANY WARRANTY.
 #
 
-add_subdirectory(interactive)
+add_subdirectory(cpp-utils)
+add_subdirectory(utils)
+
+add_executable(ServerTest ServerTest.cpp)
+
+target_link_libraries(ServerTest
+    PRIVATE libsercli
+    PRIVATE libinterutils
+    )
+
+add_executable(ClientTest ClientTest.cpp)
+
+target_link_libraries(ClientTest
+    PRIVATE libsercli
+    PRIVATE libinterutils
+    )

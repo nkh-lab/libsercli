@@ -28,6 +28,7 @@ public:
     static std::vector<std::string> SplitStr(
         const std::string& input,
         const std::string& delimiter,
+        bool only_first = false,
         bool skip_empty = true);
 };
 
