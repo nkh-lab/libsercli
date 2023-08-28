@@ -41,6 +41,9 @@ bool SocketClient::Connect(ServerDisconnectedCb server_disconnected_cb, ClientDa
 {
     Disconnect();
 
+    server_disconnected_cb_ = server_disconnected_cb;
+    data_received_cb_ = data_received_cb;
+
     client_socket_ = socket(AF_UNIX, SOCK_STREAM, 0);
     if (client_socket_ == -1)
     {
@@ -124,6 +127,11 @@ bool SocketClient::Connect(ServerDisconnectedCb server_disconnected_cb, ClientDa
                     else
                     {
                         // Handle received data
+                        if (data_received_cb_)
+                        {
+                            buffer.resize(bytes_read);
+                            data_received_cb_(buffer);
+                        }
                     }
                 }
             }

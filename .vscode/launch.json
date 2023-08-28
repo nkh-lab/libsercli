@@ -31,5 +31,15 @@
             "cwd": "${workspaceFolder}/build/tests/component/interactive/utils/tests/unit",
             "externalConsole": false
         },
+
+        {
+            "name": "HandshakeTest",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/component/handshake/HandshakeTest",
+            "args": ["./handshake_sock"],
+            "cwd": "${workspaceFolder}/build/tests/component/handshake",
+            "externalConsole": false
+        },
     ]
 }

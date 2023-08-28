@@ -210,6 +210,7 @@ bool SocketServer::Start(ClientStatusCb client_status_cb)
                     else
                     {
                         // Handle received data
+                        buffer.resize(bytes_read);
                         client->OnReceive(buffer);
                     }
                 }

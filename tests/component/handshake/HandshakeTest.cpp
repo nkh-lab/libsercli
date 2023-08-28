@@ -51,12 +51,16 @@ int main(int argc, char const* argv[])
 
                 std::cout << "Client with ID: " << client->GetId() << " sent data: " << data_str
                           << "\n";
+
+                if (data_str.compare(kHandshakeReply) == 0)
                 {
-                    std::lock_guard<std::mutex> lk(cv_m);
-                    cv_ready = true;
-                    cv_data = EXIT_SUCCESS;
+                    {
+                        std::lock_guard<std::mutex> lk(cv_m);
+                        cv_ready = true;
+                        cv_data = EXIT_SUCCESS;
+                    }
+                    cv.notify_all();
                 }
-                cv.notify_all();
             });
 
             std::string request(kHandshakeRequest);
@@ -86,7 +90,7 @@ int main(int argc, char const* argv[])
 
                     std::cout << "Client received data: " << data_str << "\n";
 
-                    if (data_str == kHandshakeRequest)
+                    if (data_str.compare(kHandshakeRequest) == 0)
                     {
                         std::string reply(kHandshakeReply);
                         std::vector<uint8_t> reply_bytes(reply.begin(), reply.end());
