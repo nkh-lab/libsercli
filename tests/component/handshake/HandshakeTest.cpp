@@ -46,23 +46,6 @@ int main(int argc, char const* argv[])
         {
             std::cout << "Client with ID: " << client->GetId() << " connected\n";
 
-            client->SubscribeToReceive([&](IClientHandlerPtr client, const std::vector<uint8_t>& data) {
-                std::string data_str{data.begin(), data.end()};
-
-                std::cout << "Client with ID: " << client->GetId() << " sent data: " << data_str
-                          << "\n";
-
-                if (data_str.compare(kHandshakeReply) == 0)
-                {
-                    {
-                        std::lock_guard<std::mutex> lk(cv_m);
-                        cv_ready = true;
-                        cv_data = EXIT_SUCCESS;
-                    }
-                    cv.notify_all();
-                }
-            });
-
             std::string request(kHandshakeRequest);
             std::vector<uint8_t> request_bytes(request.begin(), request.end());
 
@@ -72,9 +55,26 @@ int main(int argc, char const* argv[])
             std::cout << "Client with ID: " << client->GetId() << " diconnected\n";
     };
 
+    ServerDataReceivedCb server_data_received_cb([&](IClientHandlerPtr client,
+                                                     const std::vector<uint8_t>& data) {
+        std::string data_str{data.begin(), data.end()};
+
+        std::cout << "Client with ID: " << client->GetId() << " sent data: " << data_str << "\n";
+
+        if (data_str.compare(kHandshakeReply) == 0)
+        {
+            {
+                std::lock_guard<std::mutex> lk(cv_m);
+                cv_ready = true;
+                cv_data = EXIT_SUCCESS;
+            }
+            cv.notify_all();
+        }
+    });
+
     if (server)
     {
-        if (server->Start(client_status_cb))
+        if (server->Start(client_status_cb, server_data_received_cb))
         {
             std::this_thread::sleep_for(100ms);
 

@@ -21,9 +21,7 @@
 namespace nkhlab {
 namespace sercli {
 
-class SocketClientHandler
-    : public IClientHandler
-    , public std::enable_shared_from_this<SocketClientHandler>
+class SocketClientHandler : public IClientHandler
 {
 public:
     SocketClientHandler(int client_socket);
@@ -33,9 +31,7 @@ public:
 
     bool IsConnected() override;
     bool Send(const std::vector<uint8_t>& data) override;
-    bool SubscribeToReceive(ServerDataReceivedCb data_received_cb) override;
     void Disconnected();
-    void OnReceive(const std::vector<uint8_t>& data);
 
 private:
     std::mutex mutex_;
@@ -55,7 +51,7 @@ public:
 
     ~SocketServer();
 
-    bool Start(ClientStatusCb client_status_cb) override;
+    bool Start(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb) override;
     void Stop() override;
 
 private:

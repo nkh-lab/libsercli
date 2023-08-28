@@ -58,26 +58,6 @@ void SocketClientHandler::Disconnected()
     connected_ = false;
 }
 
-bool SocketClientHandler::SubscribeToReceive(ServerDataReceivedCb data_received_cb)
-{
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    if (!connected_) return false;
-
-    data_received_cb_ = data_received_cb;
-
-    return true;
-}
-
-void SocketClientHandler::OnReceive(const std::vector<uint8_t>& data)
-{
-    if (!data_received_cb_) return;
-
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    data_received_cb_(shared_from_this(), data);
-}
-
 SocketServer::SocketServer(const std::string& unix_socket_path)
     : is_unix_{true}
     , unix_socket_path_{unix_socket_path}
@@ -97,7 +77,7 @@ SocketServer::~SocketServer()
     Stop();
 }
 
-bool SocketServer::Start(ClientStatusCb client_status_cb)
+bool SocketServer::Start(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb)
 {
     int server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_socket == -1)
@@ -138,89 +118,106 @@ bool SocketServer::Start(ClientStatusCb client_status_cb)
     }
 
     stopped_ = false;
-    worker_thread_ = std::thread([&, server_socket, epoll_fd, client_status_cb]() {
-        epoll_event server_event;
-        server_event.data.fd = server_socket;
-        server_event.events = EPOLLIN;
-        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_socket, &server_event);
-        constexpr int MAX_EVENTS = 10; // TODO: why?
-        constexpr int STOP_HANDLE_TIMEOUT_MS = 500;
-        std::vector<epoll_event> events(MAX_EVENTS);
+    worker_thread_ =
+        std::thread([&, server_socket, epoll_fd, client_status_cb, server_data_received_cb]() {
+            epoll_event server_event;
+            server_event.data.fd = server_socket;
+            server_event.events = EPOLLIN;
+            epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_socket, &server_event);
+            constexpr int MAX_EVENTS = 10; // TODO: why?
+            constexpr int STOP_HANDLE_TIMEOUT_MS = 500;
+            std::vector<epoll_event> events(MAX_EVENTS);
 
-        while (!stopped_)
-        {
-            int num_events = epoll_wait(
-                epoll_fd,
-                events.data(),
-                MAX_EVENTS,
-                STOP_HANDLE_TIMEOUT_MS); // if pass __timeout as -1 - no timeout
-            if (num_events == -1)
+            while (!stopped_)
             {
-                // Handle error
-                break;
-            }
-            else if (num_events == 0)
-            {
-                // Timeout occurred, no events - we use it to handle stop request
-            }
-
-            for (int i = 0; i < num_events; ++i)
-            {
-                int client_socket;
-
-                if (events[i].data.fd == server_socket)
+                int num_events = epoll_wait(
+                    epoll_fd,
+                    events.data(),
+                    MAX_EVENTS,
+                    STOP_HANDLE_TIMEOUT_MS); // if pass __timeout as -1 - no timeout
+                if (num_events == -1)
                 {
-                    // New client connected
-                    client_socket = accept(server_socket, nullptr, nullptr);
-                    epoll_event client_event;
-                    client_event.data.fd = client_socket;
-                    client_event.events = EPOLLIN | EPOLLET; // Edge-triggered mode
-                    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_socket, &client_event);
-
-                    auto client_pair = clients_.emplace(
-                        client_socket, std::make_shared<SocketClientHandler>(client_socket));
-
-                    SocketClientHandlerPtr& client = client_pair.first->second;
-                    if (client_status_cb) client_status_cb(client, true);
+                    // Handle error
+                    break;
                 }
-                else
+                else if (num_events == 0)
                 {
-                    // Handle data from existing clients
-                    client_socket = events[i].data.fd;
-                    constexpr size_t RECEIVER_BUFFER_SIZE = 1024; // TODO: configurable?
-                    std::vector<uint8_t> buffer(RECEIVER_BUFFER_SIZE);
-                    SocketClientHandlerPtr& client = clients_.at(client_socket);
+                    // Timeout occurred, no events - we use it to handle stop request
+                }
 
-                    int bytes_read = read(client_socket, buffer.data(), RECEIVER_BUFFER_SIZE);
-                    if (bytes_read == 0)
-                    {
-                        // Client disconnected
-                        client->Disconnected();
-                        if (client_status_cb) client_status_cb(client, false);
-                        clients_.erase(client_socket);
+                for (int i = 0; i < num_events; ++i)
+                {
+                    int client_socket;
 
-                        // Handle the disconnection
-                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_socket, nullptr);
-                        close(client_socket);
-                    }
-                    else if (bytes_read < 0)
+                    if (events[i].data.fd == server_socket)
                     {
-                        // Error occurred
+                        // New client connected
+                        client_socket = accept(server_socket, nullptr, nullptr);
+                        epoll_event client_event;
+                        client_event.data.fd = client_socket;
+                        client_event.events = EPOLLIN | EPOLLET; // Edge-triggered mode
+                        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_socket, &client_event);
+
+                        auto client_pair = clients_.emplace(
+                            client_socket, std::make_shared<SocketClientHandler>(client_socket));
+
+                        SocketClientHandlerPtr& client = client_pair.first->second;
+                        if (client_status_cb) client_status_cb(client, true);
                     }
                     else
                     {
-                        // Handle received data
-                        buffer.resize(bytes_read);
-                        client->OnReceive(buffer);
+                        // Handle data from existing clients
+                        client_socket = events[i].data.fd;
+                        constexpr size_t RECEIVER_BUFFER_SIZE = 1024; // TODO: configurable?
+                        std::vector<uint8_t> buffer(RECEIVER_BUFFER_SIZE);
+
+                        int bytes_read = read(client_socket, buffer.data(), RECEIVER_BUFFER_SIZE);
+                        if (bytes_read == 0)
+                        {
+                            // Client disconnected
+                            try
+                            {
+                                SocketClientHandlerPtr& client = clients_.at(client_socket);
+                                client->Disconnected();
+                                if (client_status_cb) client_status_cb(client, false);
+                                clients_.erase(client_socket);
+                            }
+                            catch (...)
+                            {
+                            }
+
+                            // Handle the disconnection
+                            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_socket, nullptr);
+                            close(client_socket);
+                        }
+                        else if (bytes_read < 0)
+                        {
+                            // Error occurred
+                        }
+                        else
+                        {
+                            // Handle received data
+                            if (server_data_received_cb)
+                            {
+                                try
+                                {
+                                    SocketClientHandlerPtr& client = clients_.at(client_socket);
+                                    buffer.resize(bytes_read);
+                                    server_data_received_cb(client, buffer);
+                                }
+                                catch (...)
+                                {
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        close(server_socket);
-        close(epoll_fd);
-        unlink(unix_socket_path_.c_str()); // Remove socket file
-    });
+            close(server_socket);
+            close(epoll_fd);
+            unlink(unix_socket_path_.c_str()); // Remove socket file
+        });
 
     return true;
 }
