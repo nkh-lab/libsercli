@@ -34,11 +34,9 @@ public:
     void Disconnected();
 
 private:
-    std::mutex mutex_;
-    int client_socket_;
-    std::string id_;
-    bool connected_;
-    ServerDataReceivedCb data_received_cb_;
+    const int client_socket_;
+    const std::string id_;
+    std::atomic_bool connected_;
 };
 
 using SocketClientHandlerPtr = std::shared_ptr<SocketClientHandler>;
@@ -46,7 +44,7 @@ using SocketClientHandlerPtr = std::shared_ptr<SocketClientHandler>;
 class SocketServer : public IServer
 {
 public:
-    SocketServer(const std::string& unix_socket);
+    SocketServer(const std::string& unix_socket_path);
     SocketServer(const std::string& inet_address, int port);
 
     ~SocketServer();
@@ -55,8 +53,8 @@ public:
     void Stop() override;
 
 private:
-    bool is_unix_;
-    std::string unix_socket_path_;
+    const bool is_unix_;
+    const std::string unix_socket_path_;
     std::thread worker_thread_;
     std::atomic_bool stopped_;
 

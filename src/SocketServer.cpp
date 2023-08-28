@@ -33,15 +33,11 @@ const std::string& SocketClientHandler::SocketClientHandler::GetId()
 
 bool SocketClientHandler::IsConnected()
 {
-    std::lock_guard<std::mutex> lock(mutex_);
-
     return connected_;
 }
 
 bool SocketClientHandler::Send(const std::vector<uint8_t>& data)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
-
     if (!connected_) return false;
 
     ssize_t bytes_written = write(client_socket_, data.data(), data.size());
@@ -53,8 +49,6 @@ bool SocketClientHandler::Send(const std::vector<uint8_t>& data)
 
 void SocketClientHandler::Disconnected()
 {
-    std::lock_guard<std::mutex> lock(mutex_);
-
     connected_ = false;
 }
 

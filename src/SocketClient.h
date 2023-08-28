@@ -36,8 +36,8 @@ public:
     bool Send(const std::vector<uint8_t>& data) override;
 
 private:
-    bool is_unix_;
-    std::string unix_socket_path_;
+    const bool is_unix_;
+    const std::string unix_socket_path_;
     int client_socket_;
     std::thread worker_thread_;
     std::atomic_bool disconnected_;
