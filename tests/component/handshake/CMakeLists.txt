@@ -9,5 +9,8 @@
 # but WITHOUT ANY WARRANTY.
 #
 
-add_subdirectory(handshake)
-add_subdirectory(interactive)
+add_executable(HandshakeTest HandshakeTest.cpp)
+
+target_link_libraries(HandshakeTest
+    PRIVATE libsercli
+    )
