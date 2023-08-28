@@ -41,9 +41,6 @@ bool SocketClient::Connect(ServerDisconnectedCb server_disconnected_cb, ClientDa
 {
     Disconnect();
 
-    server_disconnected_cb_ = server_disconnected_cb;
-    data_received_cb_ = data_received_cb;
-
     client_socket_ = socket(AF_UNIX, SOCK_STREAM, 0);
     if (client_socket_ == -1)
     {
@@ -77,7 +74,7 @@ bool SocketClient::Connect(ServerDisconnectedCb server_disconnected_cb, ClientDa
     }
 
     disconnected_ = false;
-    worker_thread_ = std::thread([&, epoll_fd, server_disconnected_cb]() {
+    worker_thread_ = std::thread([&, epoll_fd, server_disconnected_cb, data_received_cb]() {
         epoll_event client_event;
         client_event.data.fd = client_socket_;
         client_event.events = EPOLLIN;
@@ -127,10 +124,10 @@ bool SocketClient::Connect(ServerDisconnectedCb server_disconnected_cb, ClientDa
                     else
                     {
                         // Handle received data
-                        if (data_received_cb_)
+                        if (data_received_cb)
                         {
                             buffer.resize(bytes_read);
-                            data_received_cb_(buffer);
+                            data_received_cb(buffer);
                         }
                     }
                 }

@@ -41,9 +41,6 @@ private:
     int client_socket_;
     std::thread worker_thread_;
     std::atomic_bool disconnected_;
-
-    ServerDisconnectedCb server_disconnected_cb_;
-    ClientDataReceivedCb data_received_cb_;
 };
 
 } // namespace sercli
