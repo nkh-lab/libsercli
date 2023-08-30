@@ -11,9 +11,38 @@
 
 #include <iostream>
 
+#include "CommandHelper.h"
 #include "sercli/ServerBuilder.h"
 
 using namespace nkhlab::sercli;
+using namespace nkhlab::sercli::tests;
+
+//
+// Command format examples:
+// q: - quit
+// s:<data to send> - send one shot
+// s,n<number of sending>,d<delay in ms, between sendings>:<data to send> - send with arguments
+//
+bool HandleCommand(const std::string& in, IServer* server)
+{
+    bool ret_quit = false;
+
+    std::string command, data;
+    std::map<std::string, int> args;
+    bool parsing_res;
+
+    parsing_res = CommandHelper::ParseCommand(in, command, data, args);
+
+    if (parsing_res)
+    {
+        if (command == "q") // Quit
+        {
+            ret_quit = true;
+        }
+    }
+
+    return ret_quit;
+}
 
 int main(int argc, char const* argv[])
 {
@@ -39,8 +68,14 @@ int main(int argc, char const* argv[])
     {
         server->Start(client_status_cb, server_data_received_cb);
 
-        int in;
-        std::cin >> in;
+        for (;;)
+        {
+            std::string in;
+
+            std::getline(std::cin, in);
+
+            if (HandleCommand(in, server.get())) break;
+        }
 
         server->Stop();
     }

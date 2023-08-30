@@ -37,11 +37,10 @@ void HandleSendCommand(IClient* client, const std::vector<uint8_t>& data, int nu
 }
 
 //
-// Command format
-// q
-// q:
-// s:<data to send>
-// s,n<number of sending>,d<delay in ms, between sendings>:<data to send>
+// Command format examples:
+// q: - quit
+// s:<data to send> - send one shot
+// s,n<number of sending>,d<delay in ms, between sendings>:<data to send> - send with arguments
 //
 bool HandleCommand(const std::string& in, IClient* client)
 {
