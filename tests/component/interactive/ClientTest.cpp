@@ -27,13 +27,13 @@ void HandleSendCommand(IClient* client, const std::vector<uint8_t>& data, int nu
     {
         if (!client->Send(data))
         {
-            std::cout << "Failed!\n";
+            std::cout << "Sending Failed!\n";
             return;
         }
         if (delay_ms > 0 && i < nums - 1)
             std::this_thread::sleep_for(std::chrono::milliseconds{delay_ms});
     }
-    std::cout << "Done!\n";
+    std::cout << "Sending Done!\n";
 }
 
 //
@@ -94,8 +94,13 @@ int main(int argc, char const* argv[])
     auto client = CreateUnixClient("/tmp/my_unix_socket");
 
     ServerDisconnectedCb server_disconnected_cb = []() { std::cout << "Server disconnected\n"; };
+    ClientDataReceivedCb client_data_received_cb = [](const std::vector<uint8_t>& data) {
+        std::string data_str{data.begin(), data.end()};
 
-    if (client->Connect(server_disconnected_cb, nullptr))
+        std::cout << "Server sent data: " << data_str << "\n";
+    };
+
+    if (client->Connect(server_disconnected_cb, client_data_received_cb))
     {
         for (;;)
         {

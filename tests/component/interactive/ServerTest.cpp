@@ -10,12 +10,67 @@
  */
 
 #include <iostream>
+#include <thread>
 
 #include "CommandHelper.h"
 #include "sercli/ServerBuilder.h"
 
 using namespace nkhlab::sercli;
 using namespace nkhlab::sercli::tests;
+
+void HandleSendCommand(IServer* server, const std::vector<uint8_t>& data, int client_id, int nums, int delay_ms)
+{
+    std::cout << "Sending...\n";
+
+    if (client_id == -1)
+    {
+        if (!server->GetClients().empty())
+        {
+            for (int i = 0; i < nums; ++i)
+            {
+                if (!server->GetClients().empty())
+                {
+                    for (auto c : server->GetClients())
+                    {
+                        c->Send(data);
+                    }
+                    if (delay_ms > 0 && i < nums - 1)
+                        std::this_thread::sleep_for(std::chrono::milliseconds{delay_ms});
+                }
+                else
+                {
+                    std::cout << "Sending Failed!\n";
+                    return;
+                }
+            }
+        }
+        else
+        {
+            std::cout << "Sending Failed!\n";
+            return;
+        }
+    }
+    else
+    {
+        auto c = server->GetClient(std::to_string(client_id));
+
+        if (c)
+        {
+            for (int i = 0; i < nums; ++i)
+            {
+                c->Send(data);
+                if (delay_ms > 0 && i < nums - 1)
+                    std::this_thread::sleep_for(std::chrono::milliseconds{delay_ms});
+            }
+        }
+        else
+        {
+            std::cout << "Sending Failed!\n";
+            return;
+        }
+    }
+    std::cout << "Sending Done!\n";
+}
 
 //
 // Command format examples:
@@ -38,6 +93,38 @@ bool HandleCommand(const std::string& in, IServer* server)
         if (command == "q") // Quit
         {
             ret_quit = true;
+        }
+        else if (command == "s" && !data.empty()) // Send
+        {
+            int nums = 1, delay_ms = 0, client_id = -1;
+
+            try
+            {
+                client_id = args.at("c");
+            }
+            catch (...)
+            {
+            }
+
+            try
+            {
+                nums = args.at("n");
+            }
+            catch (...)
+            {
+            }
+
+            try
+            {
+                delay_ms = args.at("d");
+            }
+            catch (...)
+            {
+            }
+
+            std::vector<uint8_t> bytes(data.begin(), data.end());
+
+            HandleSendCommand(server, bytes, client_id, nums, delay_ms);
         }
     }
 
