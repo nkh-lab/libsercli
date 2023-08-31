@@ -44,6 +44,9 @@ public:
 
     virtual bool Start(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb) = 0;
     virtual void Stop() = 0;
+
+    virtual std::vector<IClientHandlerPtr> GetClients() = 0;
+    virtual IClientHandlerPtr GetClient(const std::string& id) = 0;
 };
 
 } // namespace sercli

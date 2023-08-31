@@ -50,11 +50,13 @@ int main(int argc, char const* argv[])
 
     auto server = CreateUnixServer("/tmp/my_unix_socket");
 
-    ClientStatusCb client_status_cb = [](IClientHandlerPtr client, bool connected) {
+    ClientStatusCb client_status_cb = [&](IClientHandlerPtr client, bool connected) {
         if (connected)
             std::cout << "Client with ID: " << client->GetId() << " connected\n";
         else
             std::cout << "Client with ID: " << client->GetId() << " diconnected\n";
+
+        std::cout << "Total clients: " << server->GetClients().size() << "\n";
     };
 
     ServerDataReceivedCb server_data_received_cb =

@@ -16,6 +16,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <algorithm>
+
 namespace nkhlab {
 namespace sercli {
 
@@ -152,11 +154,9 @@ bool SocketServer::Start(ClientStatusCb client_status_cb, ServerDataReceivedCb s
                         client_event.events = EPOLLIN | EPOLLET; // Edge-triggered mode
                         epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_socket, &client_event);
 
-                        auto client_pair = clients_.emplace(
-                            client_socket, std::make_shared<SocketClientHandler>(client_socket));
+                        auto client = AddClient(client_socket);
 
-                        SocketClientHandlerPtr& client = client_pair.first->second;
-                        if (client_status_cb) client_status_cb(client, true);
+                        if (client && client_status_cb) client_status_cb(client, true);
                     }
                     else
                     {
@@ -169,15 +169,13 @@ bool SocketServer::Start(ClientStatusCb client_status_cb, ServerDataReceivedCb s
                         if (bytes_read == 0)
                         {
                             // Client disconnected
-                            try
+                            auto client = GetClient(client_socket);
+
+                            if (client)
                             {
-                                SocketClientHandlerPtr& client = clients_.at(client_socket);
                                 client->Disconnected();
+                                RemoveClient(client_socket);
                                 if (client_status_cb) client_status_cb(client, false);
-                                clients_.erase(client_socket);
-                            }
-                            catch (...)
-                            {
                             }
 
                             // Handle the disconnection
@@ -193,15 +191,9 @@ bool SocketServer::Start(ClientStatusCb client_status_cb, ServerDataReceivedCb s
                             // Handle received data
                             if (server_data_received_cb)
                             {
-                                try
-                                {
-                                    SocketClientHandlerPtr& client = clients_.at(client_socket);
-                                    buffer.resize(bytes_read);
-                                    server_data_received_cb(client, buffer);
-                                }
-                                catch (...)
-                                {
-                                }
+                                auto client = GetClient(client_socket);
+                                buffer.resize(bytes_read);
+                                server_data_received_cb(client, buffer);
                             }
                         }
                     }
@@ -224,6 +216,69 @@ void SocketServer::Stop()
 
         if (worker_thread_.joinable()) worker_thread_.join();
     }
+}
+
+std::vector<IClientHandlerPtr> SocketServer::GetClients()
+{
+    std::lock_guard<std::mutex> lk(clients_mtx_);
+
+    std::vector<IClientHandlerPtr> clients;
+
+    std::transform(clients_.begin(), clients_.end(), std::back_inserter(clients), [](auto& kv) {
+        return kv.second;
+    });
+
+    return clients;
+}
+
+IClientHandlerPtr SocketServer::GetClient(const std::string& id)
+{
+    int id_int;
+    IClientHandlerPtr client = nullptr;
+
+    try
+    {
+        id_int = static_cast<int>(std::stoi(id));
+
+        client = GetClient(id_int);
+    }
+    catch (...)
+    {
+    }
+
+    return client;
+}
+
+SocketClientHandlerPtr SocketServer::GetClient(int id)
+{
+    std::lock_guard<std::mutex> lk(clients_mtx_);
+
+    auto it = clients_.find(id);
+
+    if (it != clients_.end())
+        return (*it).second;
+    else
+        return nullptr;
+}
+
+SocketClientHandlerPtr SocketServer::AddClient(int id)
+{
+    std::lock_guard<std::mutex> lk(clients_mtx_);
+
+    auto client = std::make_shared<SocketClientHandler>(id);
+
+    auto emplace_res = clients_.emplace(id, client);
+
+    if (emplace_res.second)
+        return client;
+    else
+        return nullptr;
+}
+
+void SocketServer::RemoveClient(int id)
+{
+    std::lock_guard<std::mutex> lk(clients_mtx_);
+    clients_.erase(id);
 }
 
 } // namespace sercli

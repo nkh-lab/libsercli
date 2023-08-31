@@ -52,13 +52,21 @@ public:
     bool Start(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb) override;
     void Stop() override;
 
+    std::vector<IClientHandlerPtr> GetClients() override;
+    IClientHandlerPtr GetClient(const std::string& id) override;
+
 private:
+    SocketClientHandlerPtr GetClient(int id);
+    SocketClientHandlerPtr AddClient(int id);
+    void RemoveClient(int id);
+
     const bool is_unix_;
     const std::string unix_socket_path_;
     std::thread worker_thread_;
     std::atomic_bool stopped_;
 
     std::map<int, SocketClientHandlerPtr> clients_;
+    std::mutex clients_mtx_;
 };
 
 } // namespace sercli
