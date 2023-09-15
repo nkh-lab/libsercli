@@ -24,7 +24,7 @@ IServerPtr CreateUnixServer(const std::string& socket_path)
 
 IServerPtr CreateInetServer(const std::string& address, int port)
 {
-    return nullptr;
+    return std::make_unique<SocketServer>(address, port);
 }
 
 } // namespace sercli

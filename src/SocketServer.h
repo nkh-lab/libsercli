@@ -62,6 +62,8 @@ private:
 
     const bool is_unix_;
     const std::string unix_socket_path_;
+    const std::string inet_address_;
+    const int inet_port_;
     std::thread worker_thread_;
     std::atomic_bool stopped_;
 

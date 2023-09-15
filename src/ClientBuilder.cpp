@@ -24,7 +24,7 @@ IClientPtr CreateUnixClient(const std::string& socket_path)
 
 IClientPtr CreateInetClient(const std::string& address, int port)
 {
-    return nullptr;
+    return std::make_unique<SocketClient>(address, port);
 }
 
 } // namespace sercli

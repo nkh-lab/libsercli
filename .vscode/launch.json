@@ -33,11 +33,21 @@
         },
 
         {
-            "name": "HandshakeTest",
+            "name": "HandshakeTest Unix",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/tests/component/handshake/HandshakeTest",
             "args": ["./handshake_sock"],
+            "cwd": "${workspaceFolder}/build/tests/component/handshake",
+            "externalConsole": false
+        },
+
+        {
+            "name": "HandshakeTest Inet",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/component/handshake/HandshakeTest",
+            "args": ["127.0.0.1", "12345"],
             "cwd": "${workspaceFolder}/build/tests/component/handshake",
             "externalConsole": false
         },

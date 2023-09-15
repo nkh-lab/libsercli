@@ -17,6 +17,8 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
+add_compile_options(-Wall -Wextra -pedantic -Werror)
+
 option(${PROJECT_NAME}_BUILD_UTESTS     "Build unit tests"          OFF)
 option(${PROJECT_NAME}_BUILD_CTESTS     "Build component tests"     OFF)
 option(${PROJECT_NAME}_BUILD_PORTABLE   "Build portable binaries"   OFF)

@@ -16,18 +16,25 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "SocketBuilder.h"
+
 namespace nkhlab {
 namespace sercli {
 
 SocketClient::SocketClient(const std::string& unix_socket_path)
     : is_unix_{true}
     , unix_socket_path_{unix_socket_path}
+    , inet_address_{}
+    , inet_port_{-1}
     , disconnected_{true}
 {
 }
 
-SocketClient::SocketClient(const std::string& inet_address, int port)
+SocketClient::SocketClient(const std::string& inet_address, int inet_port)
     : is_unix_{false}
+    , unix_socket_path_{}
+    , inet_address_{inet_address}
+    , inet_port_{inet_port}
     , disconnected_{true}
 {
 }
@@ -41,26 +48,11 @@ bool SocketClient::Connect(ServerDisconnectedCb server_disconnected_cb, ClientDa
 {
     Disconnect();
 
-    client_socket_ = socket(AF_UNIX, SOCK_STREAM, 0);
+    client_socket_ =
+        (is_unix_ ? SocketBuilder::InitSocketForUnixClient(unix_socket_path_.c_str())
+                  : SocketBuilder::InitSocketForInetClient(inet_address_.c_str(), inet_port_));
+
     if (client_socket_ == -1)
-    {
-        // Handle error
-        return false;
-    }
-
-    sockaddr_un server_unix_address;
-    server_unix_address.sun_family = AF_UNIX;
-    strncpy(
-        server_unix_address.sun_path, unix_socket_path_.c_str(), sizeof(server_unix_address.sun_path));
-
-    // Difference between Server and Client:
-    // - for Server: bind() and listen()
-    // - for Client: connect()
-
-    if (connect(
-            client_socket_,
-            reinterpret_cast<sockaddr*>(&server_unix_address),
-            sizeof(server_unix_address)) == -1)
     {
         // Handle error
         return false;

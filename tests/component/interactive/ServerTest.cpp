@@ -135,7 +135,42 @@ int main(int argc, char const* argv[])
 {
     std::cout << "Hello World from SocketServerTest!\n";
 
-    auto server = CreateUnixServer("/tmp/my_unix_socket");
+    nkhlab::sercli::IServerPtr server;
+
+    if (argc < 2)
+    {
+        std::cout << "No configuration provided! Please provide it as arguments.\n";
+        std::cout << "For UNIX socket connection: <unix socket path>\n";
+        std::cout << "For Inet connection:        <inet address> <inet port>\n";
+        return EXIT_FAILURE;
+    }
+
+    if (argc == 2)
+    {
+        std::string socket_path(argv[1]);
+
+        server = CreateUnixServer(socket_path);
+    }
+    else if (argc == 3)
+    {
+        std::string inet_address(argv[1]);
+        int inet_port = atoi(argv[2]);
+
+        server = CreateInetServer(inet_address, inet_port);
+    }
+    else
+    {
+        std::cout << "Incorrect use of arguments. Please use as below:\n";
+        std::cout << "For UNIX socket connection: <unix socket path>\n";
+        std::cout << "For Inet connection:        <inet address> <inet port>\n";
+        return EXIT_FAILURE;
+    }
+
+    if (!server)
+    {
+        std::cout << "ERROR: server is nullptr!\n";
+        return EXIT_FAILURE;
+    }
 
     ClientStatusCb client_status_cb = [&](IClientHandlerPtr client, bool connected) {
         if (connected)
@@ -153,25 +188,18 @@ int main(int argc, char const* argv[])
             std::cout << "Client with ID: " << client->GetId() << " sent data: " << data_str << "\n";
         });
 
-    if (server)
+    server->Start(client_status_cb, server_data_received_cb);
+
+    for (;;)
     {
-        server->Start(client_status_cb, server_data_received_cb);
+        std::string in;
 
-        for (;;)
-        {
-            std::string in;
+        std::getline(std::cin, in);
 
-            std::getline(std::cin, in);
-
-            if (HandleCommand(in, server.get())) break;
-        }
-
-        server->Stop();
-    }
-    else
-    {
-        std::cout << "ERROR: server is nullptr!\n";
+        if (HandleCommand(in, server.get())) break;
     }
 
-    return 0;
+    server->Stop();
+
+    return EXIT_SUCCESS;
 }

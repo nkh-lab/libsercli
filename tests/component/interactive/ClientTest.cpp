@@ -91,7 +91,42 @@ int main(int argc, char const* argv[])
 {
     std::cout << "Hello World from SocketClientTest!\n";
 
-    auto client = CreateUnixClient("/tmp/my_unix_socket");
+    nkhlab::sercli::IClientPtr client;
+
+    if (argc < 2)
+    {
+        std::cout << "No configuration provided! Please provide it as arguments.\n";
+        std::cout << "For UNIX socket connection: <unix socket path>\n";
+        std::cout << "For Inet connection:        <inet address> <inet port>\n";
+        return EXIT_FAILURE;
+    }
+
+    if (argc == 2)
+    {
+        std::string socket_path(argv[1]);
+
+        client = CreateUnixClient(socket_path);
+    }
+    else if (argc == 3)
+    {
+        std::string inet_address(argv[1]);
+        int inet_port = atoi(argv[2]);
+
+        client = CreateInetClient(inet_address, inet_port);
+    }
+    else
+    {
+        std::cout << "Incorrect use of arguments. Please use as below:\n";
+        std::cout << "For UNIX socket connection: <unix socket path>\n";
+        std::cout << "For Inet connection:        <inet address> <inet port>\n";
+        return EXIT_FAILURE;
+    }
+
+    if (!client)
+    {
+        std::cout << "ERROR: client is nullptr!\n";
+        return EXIT_FAILURE;
+    }
 
     ServerDisconnectedCb server_disconnected_cb = []() { std::cout << "Server disconnected\n"; };
     ClientDataReceivedCb client_data_received_cb = [](const std::vector<uint8_t>& data) {
@@ -116,7 +151,8 @@ int main(int argc, char const* argv[])
     else
     {
         std::cout << "Connection to Server failed!\n";
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }

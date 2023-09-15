@@ -28,18 +28,41 @@ int main(int argc, char const* argv[])
     std::mutex cv_m;
     bool cv_ready = false;
     int cv_data = EXIT_FAILURE;
+    nkhlab::sercli::IServerPtr server;
+    nkhlab::sercli::IClientPtr client;
 
     std::cout << "Hello World from HandshakeTest!\n";
 
     if (argc < 2)
     {
-        std::cout << "No socket path provided! Please provide it as argument.\n";
+        std::cout << "No configuration provided! Please provide it as arguments.\n";
+        std::cout << "For UNIX socket connection: <unix socket path>\n";
+        std::cout << "For Inet connection:        <inet address> <inet port>\n";
         return EXIT_FAILURE;
     }
 
-    std::string socket_path(argv[1]);
+    if (argc == 2)
+    {
+        std::string socket_path(argv[1]);
 
-    auto server = CreateUnixServer(socket_path);
+        server = CreateUnixServer(socket_path);
+        client = CreateUnixClient(socket_path);
+    }
+    else if (argc == 3)
+    {
+        std::string inet_address(argv[1]);
+        int inet_port = atoi(argv[2]);
+
+        server = CreateInetServer(inet_address, inet_port);
+        client = CreateInetClient(inet_address, inet_port);
+    }
+    else
+    {
+        std::cout << "Incorrect use of arguments. Please use as below:\n";
+        std::cout << "For UNIX socket connection: <unix socket path>\n";
+        std::cout << "For Inet connection:        <inet address> <inet port>\n";
+        return EXIT_FAILURE;
+    }
 
     ClientStatusCb client_status_cb = [&](IClientHandlerPtr client, bool connected) {
         if (connected)
@@ -77,8 +100,6 @@ int main(int argc, char const* argv[])
         if (server->Start(client_status_cb, server_data_received_cb))
         {
             std::this_thread::sleep_for(100ms);
-
-            auto client = CreateUnixClient(socket_path);
 
             if (client)
             {

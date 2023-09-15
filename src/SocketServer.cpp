@@ -11,12 +11,16 @@
 
 #include "SocketServer.h"
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 
 #include <algorithm>
+
+#include "SocketBuilder.h"
 
 namespace nkhlab {
 namespace sercli {
@@ -57,13 +61,18 @@ void SocketClientHandler::Disconnected()
 SocketServer::SocketServer(const std::string& unix_socket_path)
     : is_unix_{true}
     , unix_socket_path_{unix_socket_path}
+    , inet_address_{}
+    , inet_port_{-1}
     , stopped_{true}
 {
     unlink(unix_socket_path_.c_str()); // Remove any existing socket file
 }
 
-SocketServer::SocketServer(const std::string& inet_address, int port)
+SocketServer::SocketServer(const std::string& inet_address, int inet_port)
     : is_unix_{false}
+    , unix_socket_path_{}
+    , inet_address_{inet_address}
+    , inet_port_{inet_port}
     , stopped_{true}
 {
 }
@@ -75,32 +84,13 @@ SocketServer::~SocketServer()
 
 bool SocketServer::Start(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb)
 {
-    int server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
+    Stop();
+
+    int server_socket =
+        (is_unix_ ? SocketBuilder::InitSocketForUnixServer(unix_socket_path_.c_str())
+                  : SocketBuilder::InitSocketForInetServer(inet_address_.c_str(), inet_port_));
+
     if (server_socket == -1)
-    {
-        // Handle error
-        return false;
-    }
-
-    sockaddr_un server_unix_address;
-    server_unix_address.sun_family = AF_UNIX;
-    strncpy(
-        server_unix_address.sun_path, unix_socket_path_.c_str(), sizeof(server_unix_address.sun_path));
-
-    // Difference between Server and Client:
-    // - for Server: bind() and listen()
-    // - for Client: connect()
-
-    if (bind(
-            server_socket,
-            reinterpret_cast<sockaddr*>(&server_unix_address),
-            sizeof(server_unix_address)) == -1)
-    {
-        // Handle error
-        return false;
-    }
-
-    if (listen(server_socket, SOMAXCONN) == -1)
     {
         // Handle error
         return false;

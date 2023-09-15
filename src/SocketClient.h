@@ -26,8 +26,8 @@ namespace sercli {
 class SocketClient : public IClient
 {
 public:
-    SocketClient(const std::string& unix_socket);
-    SocketClient(const std::string& inet_address, int port);
+    SocketClient(const std::string& unix_socket_path);
+    SocketClient(const std::string& inet_address, int inet_port);
     ~SocketClient();
 
     bool Connect(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb) override;
@@ -36,8 +36,13 @@ public:
     bool Send(const std::vector<uint8_t>& data) override;
 
 private:
+    int InitSocketForUnix(const std::string& unix_socket_path);
+    int InitSocketForInet(const std::string& inet_address, int inet_port);
+
     const bool is_unix_;
     const std::string unix_socket_path_;
+    const std::string inet_address_;
+    const int inet_port_;
     int client_socket_;
     std::thread worker_thread_;
     std::atomic_bool disconnected_;
