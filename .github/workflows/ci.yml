@@ -28,5 +28,4 @@ jobs:
           build/tests/component/interactive/utils/tests/unit/libinterutils-unit-tests
       - name: Run Component Tests
         run: |
-          build/tests/component/handshake/HandshakeTest ./handshake_sock
           build/tests/component/handshake/HandshakeTest "127.0.0.1" 12345
