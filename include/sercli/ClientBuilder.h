@@ -15,13 +15,21 @@
 
 #include "sercli/IClient.h"
 
+#ifdef __linux__
+#define DLL_EXPORT
+#else
+#define DLL_EXPORT __declspec(dllexport)
+#endif
+
 namespace nkhlab {
 namespace sercli {
 
 using IClientPtr = std::unique_ptr<IClient>;
 
-IClientPtr CreateUnixClient(const std::string& socket_path);
-IClientPtr CreateInetClient(const std::string& address, int port);
+IClientPtr DLL_EXPORT CreateUnixClient(const std::string& socket_path);
+IClientPtr DLL_EXPORT CreateInetClient(const std::string& address, int port);
 
 } // namespace sercli
 } // namespace nkhlab
+
+#undef DLL_EXPORT

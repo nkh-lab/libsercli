@@ -19,7 +19,11 @@ namespace sercli {
 
 IClientPtr CreateUnixClient(const std::string& socket_path)
 {
+#ifdef __linux__
     return std::make_unique<SocketClient>(socket_path);
+#else
+#error "Unix socket connection is not supported!"
+#endif
 }
 
 IClientPtr CreateInetClient(const std::string& address, int port)

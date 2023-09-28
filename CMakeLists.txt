@@ -17,7 +17,11 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
-add_compile_options(-Wall -Wextra -pedantic -Werror)
+if(MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -pedantic -Werror)
+endif()
 
 option(${PROJECT_NAME}_BUILD_UTESTS     "Build unit tests"          OFF)
 option(${PROJECT_NAME}_BUILD_CTESTS     "Build component tests"     OFF)

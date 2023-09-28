@@ -16,13 +16,19 @@
 #include <string>
 #include <vector>
 
+#ifdef __linux__
+#define DLL_EXPORT
+#else
+#define DLL_EXPORT __declspec(dllexport)
+#endif
+
 namespace nkhlab {
 namespace sercli {
 
 class IClientHandler;
 using IClientHandlerPtr = std::shared_ptr<IClientHandler>;
 
-class IClientHandler
+class DLL_EXPORT IClientHandler
 {
 public:
     virtual ~IClientHandler() = default;
@@ -37,7 +43,7 @@ using ClientStatusCb = std::function<void(IClientHandlerPtr client, bool connect
 using ServerDataReceivedCb =
     std::function<void(IClientHandlerPtr client, const std::vector<uint8_t>& data)>;
 
-class IServer
+class DLL_EXPORT IServer
 {
 public:
     virtual ~IServer() = default;
@@ -51,3 +57,5 @@ public:
 
 } // namespace sercli
 } // namespace nkhlab
+
+#undef DLL_EXPORT

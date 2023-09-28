@@ -1,9 +1,16 @@
 ## How to build
-### Debug and Tests
+### Linux
+#### Debug and Tests
 ```
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Debug -Dlibsercli_BUILD_CTESTS=ON -Dlibsercli_BUILD_UTESTS=ON ..
 make
+```
+### Windows
+```
+mkdir build && cd build
+cmake -G "Visual Studio 17 2022" ..
+cmake --build . --config Release
 ```
 
 ## Tests

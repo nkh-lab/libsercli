@@ -15,13 +15,19 @@
 #include <string>
 #include <vector>
 
+#ifdef __linux__
+#define DLL_EXPORT
+#else
+#define DLL_EXPORT __declspec(dllexport)
+#endif
+
 namespace nkhlab {
 namespace sercli {
 
 using ServerDisconnectedCb = std::function<void()>;
 using ClientDataReceivedCb = std::function<void(const std::vector<uint8_t>& data)>;
 
-class IClient
+class DLL_EXPORT IClient
 {
 public:
     virtual ~IClient() = default;
@@ -36,3 +42,5 @@ public:
 
 } // namespace sercli
 } // namespace nkhlab
+
+#undef DLL_EXPORT

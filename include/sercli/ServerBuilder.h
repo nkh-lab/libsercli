@@ -15,13 +15,21 @@
 
 #include "sercli/IServer.h"
 
+#ifdef __linux__
+#define DLL_EXPORT
+#else
+#define DLL_EXPORT __declspec(dllexport)
+#endif
+
 namespace nkhlab {
 namespace sercli {
 
 using IServerPtr = std::unique_ptr<IServer>;
 
-IServerPtr CreateUnixServer(const std::string& socket_path);
-IServerPtr CreateInetServer(const std::string& address, int port);
+IServerPtr DLL_EXPORT CreateUnixServer(const std::string& socket_path);
+IServerPtr DLL_EXPORT CreateInetServer(const std::string& address, int port);
 
 } // namespace sercli
 } // namespace nkhlab
+
+#undef DLL_EXPORT
