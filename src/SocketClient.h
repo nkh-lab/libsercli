@@ -11,36 +11,145 @@
 
 #pragma once
 
+#include <sys/epoll.h>
+
 #include <atomic>
 #include <map>
 #include <thread>
 
 #include "sercli/IClient.h"
 
+#include "SmartSocket.h"
+
 namespace nkhlab {
 namespace sercli {
 
+template <class SocketT>
 class SocketClient : public IClient
 {
 public:
-    SocketClient(const std::string& unix_socket_path);
-    SocketClient(const std::string& inet_address, int inet_port);
-    ~SocketClient();
+    template <class... Args>
+    SocketClient(const Args&... args)
+        : client_socket_{args...}
+        , disconnected_{true}
+    {
+    }
 
-    bool Connect(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb) override;
-    void Disconnect() override;
+    ~SocketClient() { Disconnect(); }
 
-    bool Send(const std::vector<uint8_t>& data) override;
+    bool Connect(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb) override
+    {
+        bool ret = false;
+
+        Disconnect();
+
+        client_socket_.Start();
+
+        if (client_socket_.GetRawSocket() != SOCKET_ERROR)
+        {
+            disconnected_ = false;
+            worker_thread_ =
+                std::thread(&SocketClient::Routine, this, server_disconnected_cb, data_received_cb);
+            ret = true;
+        }
+
+        return ret;
+    }
+
+    void Disconnect() override
+    {
+        disconnected_ = true;
+
+        if (worker_thread_.joinable()) worker_thread_.join();
+    }
+
+    bool Send(const std::vector<uint8_t>& data) override
+    {
+        if (disconnected_) return false;
+
+        // Send the message to the server using write()
+        ssize_t bytes_written = write(client_socket_.GetRawSocket(), data.data(), data.size());
+
+        if (bytes_written == -1 || (static_cast<size_t>(bytes_written) != data.size()))
+            return false;
+
+        return true;
+    }
 
 private:
-    int InitSocketForUnix(const std::string& unix_socket_path);
-    int InitSocketForInet(const std::string& inet_address, int inet_port);
+    void Routine(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb)
+    {
+        int epoll_fd = epoll_create1(0);
+        if (epoll_fd == -1)
+        {
+            // Handle error
+            disconnected_ = true;
+        }
 
-    const bool is_unix_;
-    const std::string unix_socket_path_;
-    const std::string inet_address_;
-    const int inet_port_;
-    int client_socket_;
+        epoll_event client_event;
+        client_event.data.fd = client_socket_.GetRawSocket();
+        client_event.events = EPOLLIN;
+        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_socket_.GetRawSocket(), &client_event);
+        constexpr int MAX_EVENTS = 10; // TODO: why?
+        constexpr int STOP_HANDLE_TIMEOUT_MS = 500;
+        std::vector<epoll_event> events(MAX_EVENTS);
+
+        while (!disconnected_)
+        {
+            int num_events = epoll_wait(
+                epoll_fd,
+                events.data(),
+                MAX_EVENTS,
+                STOP_HANDLE_TIMEOUT_MS); // if pass __timeout as -1 - no timeout
+            if (num_events == -1)
+            {
+                // Handle error
+                break;
+            }
+            else if (num_events == 0)
+            {
+                // Timeout occurred, no events - we use it to handle stop request
+            }
+
+            for (int i = 0; i < num_events; ++i)
+            {
+                if (events[i].data.fd == client_socket_.GetRawSocket())
+                {
+                    // Handle data from Server
+                    constexpr size_t RECEIVER_BUFFER_SIZE = 1024; // TODO: configurable?
+                    std::vector<uint8_t> buffer(RECEIVER_BUFFER_SIZE);
+
+                    int bytes_read =
+                        read(client_socket_.GetRawSocket(), buffer.data(), RECEIVER_BUFFER_SIZE);
+                    if (bytes_read == 0)
+                    {
+                        // Server disconnected
+                        if (server_disconnected_cb) server_disconnected_cb();
+                        disconnected_ = true;
+                        break;
+                        break;
+                    }
+                    else if (bytes_read < 0)
+                    {
+                        // Error occurred
+                    }
+                    else
+                    {
+                        // Handle received data
+                        if (data_received_cb)
+                        {
+                            buffer.resize(bytes_read);
+                            data_received_cb(buffer);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (epoll_fd != -1) close(epoll_fd);
+    }
+
+    SmartSocket<Client, SocketT> client_socket_;
     std::thread worker_thread_;
     std::atomic_bool disconnected_;
 };

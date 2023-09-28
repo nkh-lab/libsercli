@@ -11,12 +11,17 @@
 
 #pragma once
 
+#include <sys/epoll.h>
+
+#include <algorithm>
 #include <atomic>
 #include <map>
 #include <mutex>
 #include <thread>
 
 #include "sercli/IServer.h"
+
+#include "SmartSocket.h"
 
 namespace nkhlab {
 namespace sercli {
@@ -41,29 +46,206 @@ private:
 
 using SocketClientHandlerPtr = std::shared_ptr<SocketClientHandler>;
 
+template <class SocketT>
 class SocketServer : public IServer
 {
 public:
-    SocketServer(const std::string& unix_socket_path);
-    SocketServer(const std::string& inet_address, int port);
+    template <class... Args>
+    SocketServer(const Args&... args)
+        : server_socket_{args...}
+        , stopped_{true}
+    {
+    }
 
-    ~SocketServer();
+    ~SocketServer() { Stop(); }
 
-    bool Start(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb) override;
-    void Stop() override;
+    bool Start(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb) override
+    {
+        bool ret = false;
 
-    std::vector<IClientHandlerPtr> GetClients() override;
-    IClientHandlerPtr GetClient(const std::string& id) override;
+        Stop();
+
+        server_socket_.Start();
+
+        if (server_socket_.GetRawSocket() != SOCKET_ERROR)
+        {
+            stopped_ = false;
+            worker_thread_ =
+                std::thread(&SocketServer::Routine, this, client_status_cb, server_data_received_cb);
+            ret = true;
+        }
+
+        return ret;
+    }
+
+    void Stop() override
+    {
+        stopped_ = true;
+
+        if (worker_thread_.joinable()) worker_thread_.join();
+    }
+
+    std::vector<IClientHandlerPtr> GetClients() override
+    {
+        std::lock_guard<std::mutex> lk(clients_mtx_);
+
+        std::vector<IClientHandlerPtr> clients;
+
+        std::transform(clients_.begin(), clients_.end(), std::back_inserter(clients), [](auto& kv) {
+            return kv.second;
+        });
+
+        return clients;
+    }
+
+    IClientHandlerPtr GetClient(const std::string& id) override
+    {
+        int id_int;
+        IClientHandlerPtr client = nullptr;
+
+        try
+        {
+            id_int = static_cast<int>(std::stoi(id));
+
+            client = GetClient(id_int);
+        }
+        catch (...)
+        {
+        }
+
+        return client;
+    }
 
 private:
-    SocketClientHandlerPtr GetClient(int id);
-    SocketClientHandlerPtr AddClient(int id);
-    void RemoveClient(int id);
+    void Routine(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb)
+    {
+        int epoll_fd = epoll_create1(0);
+        if (epoll_fd == -1)
+        {
+            // Handle error
+            stopped_ = true;
+        }
 
-    const bool is_unix_;
-    const std::string unix_socket_path_;
-    const std::string inet_address_;
-    const int inet_port_;
+        epoll_event server_event;
+        server_event.data.fd = server_socket_.GetRawSocket();
+        server_event.events = EPOLLIN;
+        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_socket_.GetRawSocket(), &server_event);
+        constexpr int MAX_EVENTS = 10; // TODO: why?
+        constexpr int STOP_HANDLE_TIMEOUT_MS = 500;
+        std::vector<epoll_event> events(MAX_EVENTS);
+
+        while (!stopped_)
+        {
+            int num_events = epoll_wait(
+                epoll_fd,
+                events.data(),
+                MAX_EVENTS,
+                STOP_HANDLE_TIMEOUT_MS); // if pass __timeout as -1 - no timeout
+            if (num_events == -1)
+            {
+                // Handle error
+                break;
+            }
+            else if (num_events == 0)
+            {
+                // Timeout occurred, no events - we use it to handle stop request
+            }
+
+            for (int i = 0; i < num_events; ++i)
+            {
+                int client_socket;
+
+                if (events[i].data.fd == server_socket_.GetRawSocket())
+                {
+                    // New client connected
+                    client_socket = accept(server_socket_.GetRawSocket(), nullptr, nullptr);
+                    epoll_event client_event;
+                    client_event.data.fd = client_socket;
+                    client_event.events = EPOLLIN | EPOLLET; // Edge-triggered mode
+                    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_socket, &client_event);
+
+                    auto client = AddClient(client_socket);
+
+                    if (client && client_status_cb) client_status_cb(client, true);
+                }
+                else
+                {
+                    // Handle data from existing clients
+                    client_socket = events[i].data.fd;
+                    constexpr size_t RECEIVER_BUFFER_SIZE = 1024; // TODO: configurable?
+                    std::vector<uint8_t> buffer(RECEIVER_BUFFER_SIZE);
+
+                    int bytes_read = read(client_socket, buffer.data(), RECEIVER_BUFFER_SIZE);
+                    if (bytes_read == 0)
+                    {
+                        // Client disconnected
+                        auto client = GetClient(client_socket);
+
+                        if (client)
+                        {
+                            client->Disconnected();
+                            RemoveClient(client_socket);
+                            if (client_status_cb) client_status_cb(client, false);
+                        }
+
+                        // Handle the disconnection
+                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_socket, nullptr);
+                        close(client_socket);
+                    }
+                    else if (bytes_read < 0)
+                    {
+                        // Error occurred
+                    }
+                    else
+                    {
+                        // Handle received data
+                        if (server_data_received_cb)
+                        {
+                            auto client = GetClient(client_socket);
+                            buffer.resize(bytes_read);
+                            server_data_received_cb(client, buffer);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (epoll_fd != -1) close(epoll_fd);
+    }
+
+    SocketClientHandlerPtr GetClient(int id)
+    {
+        std::lock_guard<std::mutex> lk(clients_mtx_);
+
+        auto it = clients_.find(id);
+
+        if (it != clients_.end())
+            return (*it).second;
+        else
+            return nullptr;
+    }
+
+    SocketClientHandlerPtr AddClient(int id)
+    {
+        std::lock_guard<std::mutex> lk(clients_mtx_);
+
+        auto client = std::make_shared<SocketClientHandler>(id);
+
+        auto emplace_res = clients_.emplace(id, client);
+
+        if (emplace_res.second)
+            return client;
+        else
+            return nullptr;
+    }
+
+    void RemoveClient(int id)
+    {
+        std::lock_guard<std::mutex> lk(clients_mtx_);
+        clients_.erase(id);
+    }
+
+    SmartSocket<Server, SocketT> server_socket_;
     std::thread worker_thread_;
     std::atomic_bool stopped_;
 

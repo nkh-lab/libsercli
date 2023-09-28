@@ -17,18 +17,18 @@
 namespace nkhlab {
 namespace sercli {
 
-IClientPtr CreateUnixClient(const std::string& socket_path)
+IClientPtr CreateUnixClient(const char* socket_path)
 {
 #ifdef __linux__
-    return std::make_unique<SocketClient>(socket_path);
+    return std::make_unique<SocketClient<UnixSocket>>(socket_path);
 #else
 #error "Unix socket connection is not supported!"
 #endif
 }
 
-IClientPtr CreateInetClient(const std::string& address, int port)
+IClientPtr CreateInetClient(const char* address, int port)
 {
-    return std::make_unique<SocketClient>(address, port);
+    return std::make_unique<SocketClient<InetSocket>>(address, port);
 }
 
 } // namespace sercli

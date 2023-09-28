@@ -43,14 +43,14 @@ int main(int argc, char const* argv[])
 
     if (argc == 2)
     {
-        std::string socket_path(argv[1]);
+        const char* socket_path = argv[1];
 
         server = CreateUnixServer(socket_path);
         client = CreateUnixClient(socket_path);
     }
     else if (argc == 3)
     {
-        std::string inet_address(argv[1]);
+        const char* inet_address = argv[1];
         int inet_port = atoi(argv[2]);
 
         server = CreateInetServer(inet_address, inet_port);

@@ -26,8 +26,8 @@ namespace sercli {
 
 using IClientPtr = std::unique_ptr<IClient>;
 
-IClientPtr DLL_EXPORT CreateUnixClient(const std::string& socket_path);
-IClientPtr DLL_EXPORT CreateInetClient(const std::string& address, int port);
+IClientPtr DLL_EXPORT CreateUnixClient(const char* socket_path);
+IClientPtr DLL_EXPORT CreateInetClient(const char* address, int port);
 
 } // namespace sercli
 } // namespace nkhlab
