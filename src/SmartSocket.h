@@ -11,11 +11,17 @@
 
 #pragma once
 
+#ifdef __linux__
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#else
+#include <Winsock2.h>
+#include <ws2tcpip.h>
+#include <BaseTsd.h>
+#endif
 
 #include <string>
 
@@ -24,7 +30,19 @@ namespace sercli {
 
 #ifdef __linux__
 using SOCKET = int;
-constexpr int SOCKET_ERROR = -1;
+constexpr SOCKET kSocketError = -1;
+#else
+constexpr SOCKET kSocketError = static_cast<SOCKET>(SOCKET_ERROR);
+using ssize_t = SSIZE_T;
+
+class WinsockInitializer
+{
+public:
+    static WinsockInitializer& getInstance();
+private:
+    WinsockInitializer();
+    ~WinsockInitializer();
+};
 #endif
 
 // RoleT
@@ -43,7 +61,7 @@ class BaseSocket
 {
 public:
     BaseSocket()
-        : sock_{SOCKET_ERROR}
+        : sock_{kSocketError}
     {
     }
     BaseSocket(const BaseSocket&) = delete;
@@ -60,6 +78,7 @@ protected:
     SockAddrT sock_addr_;
 };
 
+#ifdef __linux__
 class UnixSocket : public BaseSocket<sockaddr_un>
 {
 public:
@@ -73,6 +92,7 @@ public:
 protected:
     const std::string path_;
 };
+#endif
 
 class InetSocket : public BaseSocket<sockaddr_in>
 {
@@ -82,8 +102,14 @@ public:
         sock_ = socket(AF_INET, SOCK_STREAM, 0);
 
         sock_addr_.sin_family = AF_INET;
+#ifdef __linux__
         sock_addr_.sin_addr.s_addr = inet_addr(address);
         sock_addr_.sin_port = htons(port);
+#else
+        inet_pton(sock_addr_.sin_family, address, &sock_addr_.sin_addr.s_addr);
+        sock_addr_.sin_port = htons(static_cast<u_short>(port));
+#endif
+        
     }
 };
 
@@ -101,7 +127,7 @@ public:
 
     ~SmartSocket()
     {
-        if (SocketT::sock_ != SOCKET_ERROR) Close();
+        if (SocketT::sock_ != kSocketError) Close();
     }
 
     SmartSocket(const SmartSocket&) = delete;
@@ -109,7 +135,7 @@ public:
 
     void Start()
     {
-        if (!started_ && SocketT::sock_ != SOCKET_ERROR)
+        if (!started_ && SocketT::sock_ != kSocketError)
         {
             if (StartSocket<RoleT>(SocketT::sock_, SocketT::GetAddr(), SocketT::GetLen()))
             {

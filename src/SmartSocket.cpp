@@ -14,10 +14,33 @@
 namespace nkhlab {
 namespace sercli {
 
+#ifdef __linux__
+#else
+
+WinsockInitializer& winsockInitializer = WinsockInitializer::getInstance();
+
+WinsockInitializer& WinsockInitializer::getInstance() 
+{
+    static WinsockInitializer instance; // This ensures a single instance
+    return instance;
+}
+
+WinsockInitializer::WinsockInitializer() 
+{
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
+}
+
+WinsockInitializer::~WinsockInitializer() 
+{
+    WSACleanup();
+}
+#endif
+
 template <>
 bool StartSocket<Server>(SOCKET sock, sockaddr* addr, size_t len)
 {
-    if (bind(sock, addr, len) != SOCKET_ERROR && listen(sock, SOMAXCONN) != SOCKET_ERROR)
+    if (bind(sock, addr, static_cast<socklen_t>(len)) != kSocketError && listen(sock, SOMAXCONN) != kSocketError)
     {
         return true;
     }
@@ -28,7 +51,7 @@ bool StartSocket<Server>(SOCKET sock, sockaddr* addr, size_t len)
 template <>
 bool StartSocket<Client>(SOCKET sock, sockaddr* addr, size_t len)
 {
-    if (connect(sock, addr, len) != SOCKET_ERROR)
+    if (connect(sock, addr, static_cast<socklen_t>(len)) != kSocketError)
     {
         return true;
     }
@@ -37,7 +60,7 @@ bool StartSocket<Client>(SOCKET sock, sockaddr* addr, size_t len)
 }
 
 // Specialization for Unix
-
+#ifdef __linux__
 template <>
 void SmartSocket<Server, UnixSocket>::Open()
 {
@@ -50,7 +73,7 @@ void SmartSocket<Server, UnixSocket>::Close()
 {
     close(sock_);
     unlink(path_.c_str()); // Remove socket file after use
-    sock_ = SOCKET_ERROR;
+    sock_ = kSocketError;
 }
 
 template <>
@@ -63,9 +86,9 @@ template <>
 void SmartSocket<Client, UnixSocket>::Close()
 {
     close(sock_);
-    sock_ = SOCKET_ERROR;
+    sock_ = kSocketError;
 }
-
+#endif
 // Specialization for Inet
 
 template <>
@@ -77,8 +100,12 @@ void SmartSocket<Server, InetSocket>::Open()
 template <>
 void SmartSocket<Server, InetSocket>::Close()
 {
+#ifdef __linux__
     close(sock_);
-    sock_ = SOCKET_ERROR;
+#else
+    closesocket(sock_);
+#endif
+    sock_ = kSocketError;
 }
 
 template <>
@@ -90,8 +117,12 @@ void SmartSocket<Client, InetSocket>::Open()
 template <>
 void SmartSocket<Client, InetSocket>::Close()
 {
+#ifdef __linux__
     close(sock_);
-    sock_ = SOCKET_ERROR;
+#else
+    closesocket(sock_);
+#endif
+    sock_ = kSocketError;
 }
 
 } // namespace sercli

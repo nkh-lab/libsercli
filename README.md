@@ -8,8 +8,9 @@ make
 ```
 ### Windows
 ```
-mkdir build && cd build
-cmake -G "Visual Studio 17 2022" ..
+mkdir build
+cd build
+cmake -G "Visual Studio 17 2022" -Dlibsercli_BUILD_CTESTS=ON ..
 cmake --build . --config Release
 ```
 
@@ -100,6 +101,7 @@ q
 ## Troubleshooting
 ### Helpful tools
 #### netstat
+Linux:
 ```
 netstat -tuln | grep 12345
 tcp        0      0 127.0.0.1:12345         0.0.0.0:*               LISTEN
@@ -107,4 +109,9 @@ tcp        0      0 127.0.0.1:12345         0.0.0.0:*               LISTEN
 ```
 netstat -lp | grep handshake
 unix  2      [ ACC ]     STREAM     LISTENING     3569003  1064897/HandshakeTe  ./handshake_sock
+```
+Windows:
+```
+netstat -an | find "12345"
+TCP    127.0.0.1:12345        0.0.0.0:0              LISTENING
 ```

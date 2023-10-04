@@ -11,10 +11,13 @@
 
 #pragma once
 
+#ifdef __linux__
 #include <sys/epoll.h>
+#endif
 
 #include <algorithm>
 #include <atomic>
+#include <iterator>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -67,7 +70,7 @@ public:
 
         server_socket_.Start();
 
-        if (server_socket_.GetRawSocket() != SOCKET_ERROR)
+        if (server_socket_.GetRawSocket() != kSocketError)
         {
             stopped_ = false;
             worker_thread_ =
@@ -117,6 +120,7 @@ public:
     }
 
 private:
+#ifdef __linux__
     void Routine(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb)
     {
         int epoll_fd = epoll_create1(0);
@@ -212,6 +216,12 @@ private:
 
         if (epoll_fd != -1) close(epoll_fd);
     }
+#else
+    void Routine(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb)
+    {
+        
+    }
+#endif
 
     SocketClientHandlerPtr GetClient(int id)
     {

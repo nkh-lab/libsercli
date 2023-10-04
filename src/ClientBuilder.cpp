@@ -13,6 +13,7 @@
 
 #include "SocketClient.h"
 #include "sercli/ClientBuilder.h"
+#include "Macros.h"
 
 namespace nkhlab {
 namespace sercli {
@@ -22,7 +23,8 @@ IClientPtr CreateUnixClient(const char* socket_path)
 #ifdef __linux__
     return std::make_unique<SocketClient<UnixSocket>>(socket_path);
 #else
-#error "Unix socket connection is not supported!"
+    UNUSED(socket_path);
+    return nullptr;
 #endif
 }
 

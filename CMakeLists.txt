@@ -19,6 +19,7 @@ set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
 if(MSVC)
     add_compile_options(/W4 /WX)
+    list(APPEND OS_LIBS Ws2_32)
 else()
     add_compile_options(-Wall -Wextra -pedantic -Werror)
 endif()
@@ -46,7 +47,8 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE src
     )
 
-#target_link_libraries(${PROJECT_NAME}
-#    )
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE ${OS_LIBS}
+    )
 
 add_subdirectory(tests)

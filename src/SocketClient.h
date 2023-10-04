@@ -11,7 +11,9 @@
 
 #pragma once
 
+#ifdef __linux__
 #include <sys/epoll.h>
+#endif
 
 #include <atomic>
 #include <map>
@@ -45,7 +47,7 @@ public:
 
         client_socket_.Start();
 
-        if (client_socket_.GetRawSocket() != SOCKET_ERROR)
+        if (client_socket_.GetRawSocket() != kSocketError)
         {
             disconnected_ = false;
             worker_thread_ =
@@ -67,16 +69,19 @@ public:
     {
         if (disconnected_) return false;
 
-        // Send the message to the server using write()
+#ifdef __linux__
         ssize_t bytes_written = write(client_socket_.GetRawSocket(), data.data(), data.size());
-
-        if (bytes_written == -1 || (static_cast<size_t>(bytes_written) != data.size()))
+#else
+        ssize_t bytes_written = send(client_socket_.GetRawSocket(), reinterpret_cast<const char*>(data.data()), static_cast<int>(data.size()), 0);
+#endif
+        if (bytes_written == -1 || bytes_written != static_cast<ssize_t>(data.size()))
             return false;
 
         return true;
     }
 
 private:
+#ifdef __linux__
     void Routine(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb)
     {
         int epoll_fd = epoll_create1(0);
@@ -148,6 +153,12 @@ private:
 
         if (epoll_fd != -1) close(epoll_fd);
     }
+#else
+void Routine(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb)
+{
+
+}
+#endif
 
     SmartSocket<Client, SocketT> client_socket_;
     std::thread worker_thread_;

@@ -98,7 +98,7 @@ bool CommandHelper::ParseArgument(const std::string& in, std::string& arg, int& 
                 {
                     value = static_cast<int>(std::stoi(in.substr(found)));
                 }
-                catch (const std::exception& e)
+                catch (...)
                 {
                     ret = false;
                 }
