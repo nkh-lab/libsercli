@@ -29,4 +29,21 @@ jobs:
       - name: Run Component Tests
         run: |
           build/tests/component/handshake/HandshakeTest ./handshake_sock
-          build/tests/component/handshake/HandshakeTest "127.0.0.1" 12345
+          build/tests/component/handshake/HandshakeTest 127.0.0.1 12345
+
+  Build-on-Windows:
+      runs-on: windows-latest
+      steps:
+        - uses: actions/checkout@v1
+        - uses: microsoft/setup-msbuild@v1.1
+        - name: Build with Component Tests
+          run: |
+            mkdir build && cd build
+            cmake -G "Visual Studio 17 2022" -Dlibsercli_BUILD_CTESTS=ON ..
+            cmake --build . --config Release
+        - name: Copy dll
+          run: |
+            cp build\Release\libsercli.dll build\tests\component\handshake\Release
+        - name: Run Component Tests
+          run: |
+            build\tests\component\handshake\Release\HandshakeTest.exe 127.0.0.1 12345
