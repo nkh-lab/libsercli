@@ -95,13 +95,14 @@ Server sent data: ping
 Server sent data: ping
 Server sent data: ping
 Server disconnected
-q
+q:
 ```
 
 ## Troubleshooting
 ### Helpful tools
-#### netstat
-Linux:
+* netstat
+
+Linux
 ```
 netstat -tuln | grep 12345
 tcp        0      0 127.0.0.1:12345         0.0.0.0:*               LISTEN
@@ -110,7 +111,7 @@ tcp        0      0 127.0.0.1:12345         0.0.0.0:*               LISTEN
 netstat -lp | grep handshake
 unix  2      [ ACC ]     STREAM     LISTENING     3569003  1064897/HandshakeTe  ./handshake_sock
 ```
-Windows:
+Windows
 ```
 netstat -an | find "12345"
 TCP    127.0.0.1:12345        0.0.0.0:0              LISTENING

@@ -19,19 +19,19 @@ namespace sercli {
 
 WinsockInitializer& winsockInitializer = WinsockInitializer::getInstance();
 
-WinsockInitializer& WinsockInitializer::getInstance() 
+WinsockInitializer& WinsockInitializer::getInstance()
 {
     static WinsockInitializer instance; // This ensures a single instance
     return instance;
 }
 
-WinsockInitializer::WinsockInitializer() 
+WinsockInitializer::WinsockInitializer()
 {
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 }
 
-WinsockInitializer::~WinsockInitializer() 
+WinsockInitializer::~WinsockInitializer()
 {
     WSACleanup();
 }
@@ -40,7 +40,8 @@ WinsockInitializer::~WinsockInitializer()
 template <>
 bool StartSocket<Server>(SOCKET sock, sockaddr* addr, size_t len)
 {
-    if (bind(sock, addr, static_cast<socklen_t>(len)) != kSocketError && listen(sock, SOMAXCONN) != kSocketError)
+    if (bind(sock, addr, static_cast<socklen_t>(len)) != kSocketError &&
+        listen(sock, SOMAXCONN) != kSocketError)
     {
         return true;
     }

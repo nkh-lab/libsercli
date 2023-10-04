@@ -72,10 +72,13 @@ public:
 #ifdef __linux__
         ssize_t bytes_written = write(client_socket_.GetRawSocket(), data.data(), data.size());
 #else
-        ssize_t bytes_written = send(client_socket_.GetRawSocket(), reinterpret_cast<const char*>(data.data()), static_cast<int>(data.size()), 0);
+        ssize_t bytes_written = send(
+            client_socket_.GetRawSocket(),
+            reinterpret_cast<const char*>(data.data()),
+            static_cast<int>(data.size()),
+            0);
 #endif
-        if (bytes_written == -1 || bytes_written != static_cast<ssize_t>(data.size()))
-            return false;
+        if (bytes_written == -1 || bytes_written != static_cast<ssize_t>(data.size())) return false;
 
         return true;
     }
@@ -154,10 +157,9 @@ private:
         if (epoll_fd != -1) close(epoll_fd);
     }
 #else
-void Routine(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb)
-{
-
-}
+    void Routine(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb)
+    {
+    }
 #endif
 
     SmartSocket<Client, SocketT> client_socket_;

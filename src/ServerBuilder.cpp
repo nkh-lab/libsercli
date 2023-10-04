@@ -11,9 +11,9 @@
 
 #include <memory>
 
+#include "Macros.h"
 #include "SocketServer.h"
 #include "sercli/ServerBuilder.h"
-#include "Macros.h"
 
 namespace nkhlab {
 namespace sercli {

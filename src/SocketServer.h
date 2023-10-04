@@ -219,7 +219,6 @@ private:
 #else
     void Routine(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb)
     {
-        
     }
 #endif
 

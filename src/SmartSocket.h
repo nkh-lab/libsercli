@@ -18,9 +18,9 @@
 #include <sys/un.h>
 #include <unistd.h>
 #else
+#include <BaseTsd.h>
 #include <Winsock2.h>
 #include <ws2tcpip.h>
-#include <BaseTsd.h>
 #endif
 
 #include <string>
@@ -39,6 +39,7 @@ class WinsockInitializer
 {
 public:
     static WinsockInitializer& getInstance();
+
 private:
     WinsockInitializer();
     ~WinsockInitializer();
@@ -109,7 +110,6 @@ public:
         inet_pton(sock_addr_.sin_family, address, &sock_addr_.sin_addr.s_addr);
         sock_addr_.sin_port = htons(static_cast<u_short>(port));
 #endif
-        
     }
 };
 
