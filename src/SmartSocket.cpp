@@ -101,12 +101,15 @@ void SmartSocket<Server, InetSocket>::Open()
 template <>
 void SmartSocket<Server, InetSocket>::Close()
 {
+    if (sock_ != kSocketError)
+    {
 #ifdef __linux__
-    close(sock_);
+        close(sock_);
 #else
-    closesocket(sock_);
+        closesocket(sock_);
 #endif
-    sock_ = kSocketError;
+        sock_ = kSocketError;
+    }
 }
 
 template <>
@@ -118,12 +121,15 @@ void SmartSocket<Client, InetSocket>::Open()
 template <>
 void SmartSocket<Client, InetSocket>::Close()
 {
+    if (sock_ != kSocketError)
+    {
 #ifdef __linux__
-    close(sock_);
+        close(sock_);
 #else
-    closesocket(sock_);
+        closesocket(sock_);
 #endif
-    sock_ = kSocketError;
+        sock_ = kSocketError;
+    }
 }
 
 } // namespace sercli

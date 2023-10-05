@@ -66,8 +66,6 @@ public:
     {
         bool ret = false;
 
-        Stop();
-
         server_socket_.Start();
 
         if (server_socket_.GetRawSocket() != kSocketError)
@@ -84,6 +82,11 @@ public:
     void Stop() override
     {
         stopped_ = true;
+
+#ifdef __linux__
+#else
+        server_socket_.ForceClose();
+#endif
 
         if (worker_thread_.joinable()) worker_thread_.join();
     }
@@ -219,6 +222,16 @@ private:
 #else
     void Routine(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb)
     {
+        while (!stopped_)
+        {
+            SOCKET client_socket = accept(server_socket_.GetRawSocket(), nullptr, nullptr);
+            if (client_socket != kSocketError)
+            {
+                auto client = AddClient(static_cast<int>(client_socket));
+
+                if (client && client_status_cb) client_status_cb(client, true);
+            }
+        }
     }
 #endif
 

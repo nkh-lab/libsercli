@@ -148,6 +148,14 @@ public:
         }
     }
 
+#ifdef __linux__
+#else
+    //
+    // to be able to exit from blocking accept()
+    //
+    void ForceClose() { Close(); }
+#endif
+
 private:
     void Open();
     void Close();
