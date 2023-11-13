@@ -24,10 +24,15 @@ temp/
 
 # Folders
 .settings/
-.vscode/*
+.vscode/
 
 # Exclude
 !.vscode/launch.json
+
+# VisualStudioCode #
+
+# Folders
+.vs/
 
 # Project specific #
 

@@ -21,10 +21,13 @@
 
 #include "sercli/IClient.h"
 
+#include "Constants.h"
 #include "SmartSocket.h"
 
 namespace nkhlab {
 namespace sercli {
+
+constexpr int kStopHandleTimeout_ms = 500;
 
 template <class SocketT>
 class SocketClient : public IClient
@@ -43,8 +46,6 @@ public:
     {
         bool ret = false;
 
-        Disconnect();
-
         client_socket_.Start();
 
         if (client_socket_.GetRawSocket() != kSocketError)
@@ -61,7 +62,10 @@ public:
     void Disconnect() override
     {
         disconnected_ = true;
-
+#ifdef __linux__
+#else
+        client_socket_.ForceClose();
+#endif
         if (worker_thread_.joinable()) worker_thread_.join();
     }
 
@@ -99,7 +103,6 @@ private:
         client_event.events = EPOLLIN;
         epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_socket_.GetRawSocket(), &client_event);
         constexpr int MAX_EVENTS = 10; // TODO: why?
-        constexpr int STOP_HANDLE_TIMEOUT_MS = 500;
         std::vector<epoll_event> events(MAX_EVENTS);
 
         while (!disconnected_)
@@ -108,7 +111,7 @@ private:
                 epoll_fd,
                 events.data(),
                 MAX_EVENTS,
-                STOP_HANDLE_TIMEOUT_MS); // if pass __timeout as -1 - no timeout
+                kStopHandleTimeout_ms); // if pass __timeout as -1 - no timeout
             if (num_events == -1)
             {
                 // Handle error
@@ -124,12 +127,11 @@ private:
                 if (events[i].data.fd == client_socket_.GetRawSocket())
                 {
                     // Handle data from Server
-                    constexpr size_t RECEIVER_BUFFER_SIZE = 1024; // TODO: configurable?
-                    std::vector<uint8_t> buffer(RECEIVER_BUFFER_SIZE);
+                    std::vector<uint8_t> buffer(kDataBufferSize);
 
-                    int bytes_read =
-                        read(client_socket_.GetRawSocket(), buffer.data(), RECEIVER_BUFFER_SIZE);
-                    if (bytes_read == 0)
+                    int received_bytes =
+                        read(client_socket_.GetRawSocket(), buffer.data(), buffer.size());
+                    if (received_bytes == 0)
                     {
                         // Server disconnected
                         if (server_disconnected_cb) server_disconnected_cb();
@@ -137,7 +139,7 @@ private:
                         break;
                         break;
                     }
-                    else if (bytes_read < 0)
+                    else if (received_bytes < 0)
                     {
                         // Error occurred
                     }
@@ -146,7 +148,7 @@ private:
                         // Handle received data
                         if (data_received_cb)
                         {
-                            buffer.resize(bytes_read);
+                            buffer.resize(received_bytes);
                             data_received_cb(buffer);
                         }
                     }
@@ -159,6 +161,55 @@ private:
 #else
     void Routine(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb)
     {
+        WSAOVERLAPPED overlapped = {};
+        overlapped.hEvent = WSACreateEvent();
+
+        if (overlapped.hEvent != nullptr)
+        {
+            while (!disconnected_)
+            {
+                SOCKET sock = client_socket_.GetRawSocket();
+                std::vector<uint8_t> buffer(kDataBufferSize);
+                WSABUF wsa_buf;
+                wsa_buf.len = static_cast<ULONG>(buffer.size());
+                wsa_buf.buf = reinterpret_cast<char*>(buffer.data());
+                DWORD flags = 0;
+                DWORD received_bytes = 0;
+
+                if (overlapped.hEvent != nullptr)
+                {
+                    if (WSARecv(sock, &wsa_buf, 1, &received_bytes, &flags, &overlapped, nullptr) ==
+                            SOCKET_ERROR &&
+                        WSAGetLastError() != WSA_IO_PENDING)
+                    {
+                        if (server_disconnected_cb) server_disconnected_cb();
+                        disconnected_ = true;
+                    }
+                    else
+                    {
+                        if (WSAWaitForMultipleEvents(1, &overlapped.hEvent, TRUE, INFINITE, TRUE) !=
+                            WSA_WAIT_FAILED)
+                        {
+                            if (WSAGetOverlappedResult(
+                                    sock, &overlapped, &received_bytes, FALSE, &flags))
+                            {
+                                if (received_bytes > 0)
+                                {
+                                    if (data_received_cb)
+                                    {
+                                        buffer.resize(received_bytes);
+                                        data_received_cb(buffer);
+                                    }
+                                }
+
+                                WSAResetEvent(overlapped.hEvent);
+                            }
+                        }
+                    }
+                }
+            }
+            WSACloseEvent(overlapped.hEvent);
+        }
     }
 #endif
 

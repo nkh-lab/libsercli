@@ -71,8 +71,15 @@ public:
         if (server_socket_.GetRawSocket() != kSocketError)
         {
             stopped_ = false;
+#ifdef __linux__
             worker_thread_ =
                 std::thread(&SocketServer::Routine, this, client_status_cb, server_data_received_cb);
+#else
+            connection_thread_ = std::thread(&SocketServer::ConnectionRoutine, this, client_status_cb);
+
+            data_processing_thread_ =
+                std::thread(&SocketServer::DataProcessingRoutine, this, server_data_received_cb);
+#endif
             ret = true;
         }
 
@@ -84,11 +91,12 @@ public:
         stopped_ = true;
 
 #ifdef __linux__
+        if (worker_thread_.joinable()) worker_thread_.join();
 #else
         server_socket_.ForceClose();
+        if (connection_thread_.joinable()) connection_thread_.join();
+        if (data_processing_thread_.joinable()) data_processing_thread_.join();
 #endif
-
-        if (worker_thread_.joinable()) worker_thread_.join();
     }
 
     std::vector<IClientHandlerPtr> GetClients() override
@@ -220,7 +228,7 @@ private:
         if (epoll_fd != -1) close(epoll_fd);
     }
 #else
-    void Routine(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb)
+    void ConnectionRoutine(ClientStatusCb client_status_cb)
     {
         while (!stopped_)
         {
@@ -231,8 +239,27 @@ private:
 
                 if (client && client_status_cb) client_status_cb(client, true);
             }
+            /*
+                        // Initialize the client context
+                        clientContext->clientSocket = clientSocket;
+                        ZeroMemory(&clientContext->overlapped, sizeof(OVERLAPPED));
+
+                        // Associate the client socket with the completion port
+                        if (!CreateIoCompletionPort((HANDLE)clientSocket, completionPort,
+               (ULONG_PTR)clientSocket, 0)) { std::cerr << "CreateIoCompletionPort failed" <<
+               std::endl; closesocket(clientSocket); clientContext->clientSocket = INVALID_SOCKET;
+                        continue;
+                        }
+
+                        // Start an asynchronous receive operation for this client
+                        DWORD flags = 0;
+                        WSARecv(clientContext->clientSocket, &clientContext->recvBuffer, 1,
+               &clientContext->recvBytes, &flags, &clientContext->overlapped, NULL);
+            */
         }
     }
+
+    void DataProcessingRoutine(ServerDataReceivedCb server_data_received_cb) {}
 #endif
 
     SocketClientHandlerPtr GetClient(int id)
@@ -268,11 +295,15 @@ private:
     }
 
     SmartSocket<Server, SocketT> server_socket_;
-    std::thread worker_thread_;
     std::atomic_bool stopped_;
-
     std::map<int, SocketClientHandlerPtr> clients_;
     std::mutex clients_mtx_;
+#ifdef __linux__
+    std::thread worker_thread_;
+#else
+    std::thread connection_thread_;
+    std::thread data_processing_thread_;
+#endif
 };
 
 } // namespace sercli

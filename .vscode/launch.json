@@ -24,6 +24,16 @@
         },
 
         {
+            "name": "ClientTest Win",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/component/interactive/Debug/ClientTest.exe",
+            "args": ["127.0.0.1", "12345"],
+            "cwd": "${workspaceFolder}/build/Debug",
+            "externalConsole": true
+        },
+
+        {
             "name": "libinterutils-unit-tests",
             "type": "cppdbg",
             "request": "launch",
@@ -50,6 +60,16 @@
             "args": ["127.0.0.1", "12345"],
             "cwd": "${workspaceFolder}/build/tests/component/handshake",
             "externalConsole": false
+        },
+
+        {
+            "name": "HandshakeTest Inet Win",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/component/handshake/Debug/HandshakeTest.exe",
+            "args": ["127.0.0.1", "12345"],
+            "cwd": "${workspaceFolder}/build/Debug",
+            "externalConsole": true
         },
     ]
 }
