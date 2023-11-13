@@ -116,3 +116,7 @@ Windows
 netstat -an | find "12345"
 TCP    127.0.0.1:12345        0.0.0.0:0              LISTENING
 ```
+
+## Useful links
+
+* [Tutorials on 'Advanced' Winsock 2 Network Programming using C](https://www.winsocketdotnetworkprogramming.com/winsock2programming/)

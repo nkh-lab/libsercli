@@ -259,7 +259,9 @@ private:
         }
     }
 
-    void DataProcessingRoutine(ServerDataReceivedCb server_data_received_cb) {}
+    void DataProcessingRoutine(ServerDataReceivedCb server_data_received_cb)
+    {
+    }
 #endif
 
     SocketClientHandlerPtr GetClient(int id)

@@ -153,7 +153,10 @@ public:
     //
     // to be able to exit from blocking accept()
     //
-    void ForceClose() { Close(); }
+    void ForceClose()
+    {
+        Close();
+    }
 #endif
 
 private:
