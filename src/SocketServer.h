@@ -281,32 +281,7 @@ private:
                     NULL,
                     &flags,
                     &client->wsa_overlapped_,
-                    [](DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags) {
-                        UNUSED(dwFlags);
-
-                        SocketClientHandler<SocketT>* rc = CONTAINING_RECORD(
-                            lpOverlapped, SocketClientHandler<SocketT>, wsa_overlapped_);
-                        auto client = rc->server_->GetClient(rc->client_socket_);
-
-                        // Handle completion
-                        if (dwError != 0)
-                        {
-                            client->connected_ = false;
-                            client->server_->RemoveClient(client->client_socket_);
-                            if (client->server_->client_status_cb_)
-                                client->server_->client_status_cb_(client, false);
-                        }
-                        else
-                        {
-                            if (client->server_->server_data_received_cb_)
-                            {
-                                std::vector<uint8_t> data(
-                                    client->wsa_receive_buf_.buf,
-                                    client->wsa_receive_buf_.buf + cbTransferred);
-                                client->server_->server_data_received_cb_(client, data);
-                            }
-                        }
-                    });
+                    &SocketServer<SocketT>::WsaReceiveCompletitionRoutine);
 
                 if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
                 {
@@ -316,6 +291,51 @@ private:
         }
     }
 #endif
+
+    static void WsaReceiveCompletitionRoutine(
+        DWORD error,
+        DWORD received_bytes,
+        LPWSAOVERLAPPED overlapped,
+        DWORD flags)
+    {
+        SocketClientHandler<SocketT>* rc =
+            CONTAINING_RECORD(overlapped, SocketClientHandler<SocketT>, wsa_overlapped_);
+        auto client = rc->server_->GetClient(rc->client_socket_);
+        auto& client_socket = rc->client_socket_;
+        auto& server = client->server_;
+
+        // Handle completion
+        if (error != 0)
+        {
+            client->connected_ = false;
+            server->RemoveClient(client_socket);
+            if (server->client_status_cb_) server->client_status_cb_(client, false);
+        }
+        else
+        {
+            if (server->server_data_received_cb_)
+            {
+                std::vector<uint8_t> data(
+                    client->wsa_receive_buf_.buf, client->wsa_receive_buf_.buf + received_bytes);
+                server->server_data_received_cb_(client, data);
+            }
+
+            // next receiving
+            int result = WSARecv(
+                client_socket,
+                &client->wsa_receive_buf_,
+                1,
+                NULL,
+                &flags,
+                &client->wsa_overlapped_,
+                &SocketServer<SocketT>::WsaReceiveCompletitionRoutine);
+
+            if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
+            {
+                server->RemoveClient(static_cast<int>(client_socket));
+            }
+        }
+    }
 
     SocketClientHandlerPtr<SocketT> GetClient(int id)
     {
