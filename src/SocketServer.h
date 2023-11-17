@@ -29,25 +29,51 @@
 namespace nkhlab {
 namespace sercli {
 
+template <class SocketT>
+class SocketServer;
+
+template <class SocketT>
 class SocketClientHandler : public IClientHandler
 {
 public:
-    SocketClientHandler(int client_socket);
+    SocketClientHandler(int client_socket, SocketServer<SocketT>* server)
+        : client_socket_{client_socket}
+        , server_{server}
+        , id_{std::to_string(client_socket)}
+        , connected_{true}
+    {
+    }
     ~SocketClientHandler() = default;
 
-    const std::string& GetId() override;
+    const std::string& GetId() override { return id_; }
 
-    bool IsConnected() override;
-    bool Send(const std::vector<uint8_t>& data) override;
-    void Disconnected();
+    bool IsConnected() override { return connected_; }
+    bool Send(const std::vector<uint8_t>& data) override
+    {
+        if (!connected_) return false;
+
+#ifdef __linux__
+        ssize_t bytes_written = write(client_socket_, data.data(), data.size());
+#else
+        ssize_t bytes_written = send(
+            client_socket_, reinterpret_cast<const char*>(data.data()), static_cast<int>(data.size()), 0);
+#endif
+        if (bytes_written == -1 || bytes_written != static_cast<ssize_t>(data.size())) return false;
+
+        return true;
+    }
 
 private:
     const int client_socket_;
+    const SocketServer<SocketT>* server_;
     const std::string id_;
     std::atomic_bool connected_;
+
+    friend class SocketServer<SocketT>;
 };
 
-using SocketClientHandlerPtr = std::shared_ptr<SocketClientHandler>;
+template <class SocketT>
+using SocketClientHandlerPtr = std::shared_ptr<SocketClientHandler<SocketT>>;
 
 template <class SocketT>
 class SocketServer : public IServer
@@ -198,7 +224,7 @@ private:
 
                         if (client)
                         {
-                            client->Disconnected();
+                            client->connected_ = false;
                             RemoveClient(client_socket);
                             if (client_status_cb) client_status_cb(client, false);
                         }
@@ -264,7 +290,7 @@ private:
     }
 #endif
 
-    SocketClientHandlerPtr GetClient(int id)
+    SocketClientHandlerPtr<SocketT> GetClient(int id)
     {
         std::lock_guard<std::mutex> lk(clients_mtx_);
 
@@ -276,11 +302,11 @@ private:
             return nullptr;
     }
 
-    SocketClientHandlerPtr AddClient(int id)
+    SocketClientHandlerPtr<SocketT> AddClient(int id)
     {
         std::lock_guard<std::mutex> lk(clients_mtx_);
 
-        auto client = std::make_shared<SocketClientHandler>(id);
+        auto client = std::make_shared<SocketClientHandler<SocketT>>(id, this);
 
         auto emplace_res = clients_.emplace(id, client);
 
@@ -298,7 +324,7 @@ private:
 
     SmartSocket<Server, SocketT> server_socket_;
     std::atomic_bool stopped_;
-    std::map<int, SocketClientHandlerPtr> clients_;
+    std::map<int, SocketClientHandlerPtr<SocketT>> clients_;
     std::mutex clients_mtx_;
 #ifdef __linux__
     std::thread worker_thread_;
