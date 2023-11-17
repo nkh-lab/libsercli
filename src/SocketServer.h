@@ -290,7 +290,6 @@ private:
             }
         }
     }
-#endif
 
     static void WsaReceiveCompletitionRoutine(
         DWORD error,
@@ -336,7 +335,7 @@ private:
             }
         }
     }
-
+#endif
     SocketClientHandlerPtr<SocketT> GetClient(int id)
     {
         std::lock_guard<std::mutex> lk(clients_mtx_);
