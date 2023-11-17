@@ -22,6 +22,7 @@
 #include <mutex>
 #include <thread>
 
+#include "Constants.h"
 #include "sercli/IServer.h"
 
 #include "SmartSocket.h"
@@ -42,6 +43,12 @@ public:
         , id_{std::to_string(client_socket)}
         , connected_{true}
     {
+#ifdef __linux__
+#else
+        receive_buffer_.resize(kDataBufferSize);
+        wsa_receive_buf_.buf = reinterpret_cast<CHAR*>(receive_buffer_.data());
+        wsa_receive_buf_.len = static_cast<ULONG>(receive_buffer_.size());
+#endif
     }
     ~SocketClientHandler() = default;
 
@@ -64,8 +71,14 @@ public:
     }
 
 private:
+#ifdef __linux__
+#else
+    WSAOVERLAPPED wsa_overlapped_;
+    WSABUF wsa_receive_buf_;
+    std::vector<uint8_t> receive_buffer_;
+#endif
     const int client_socket_;
-    const SocketServer<SocketT>* server_;
+    SocketServer<SocketT>* server_;
     const std::string id_;
     std::atomic_bool connected_;
 
@@ -97,15 +110,8 @@ public:
         if (server_socket_.GetRawSocket() != kSocketError)
         {
             stopped_ = false;
-#ifdef __linux__
             worker_thread_ =
                 std::thread(&SocketServer::Routine, this, client_status_cb, server_data_received_cb);
-#else
-            connection_thread_ = std::thread(&SocketServer::ConnectionRoutine, this, client_status_cb);
-
-            data_processing_thread_ =
-                std::thread(&SocketServer::DataProcessingRoutine, this, server_data_received_cb);
-#endif
             ret = true;
         }
 
@@ -117,12 +123,10 @@ public:
         stopped_ = true;
 
 #ifdef __linux__
-        if (worker_thread_.joinable()) worker_thread_.join();
 #else
         server_socket_.ForceClose();
-        if (connection_thread_.joinable()) connection_thread_.join();
-        if (data_processing_thread_.joinable()) data_processing_thread_.join();
 #endif
+        if (worker_thread_.joinable()) worker_thread_.join();
     }
 
     std::vector<IClientHandlerPtr> GetClients() override
@@ -254,8 +258,11 @@ private:
         if (epoll_fd != -1) close(epoll_fd);
     }
 #else
-    void ConnectionRoutine(ClientStatusCb client_status_cb)
+    void Routine(ClientStatusCb client_status_cb, ServerDataReceivedCb server_data_received_cb)
     {
+        client_status_cb_ = client_status_cb;
+        server_data_received_cb_ = server_data_received_cb;
+
         while (!stopped_)
         {
             SOCKET client_socket = accept(server_socket_.GetRawSocket(), nullptr, nullptr);
@@ -264,29 +271,49 @@ private:
                 auto client = AddClient(static_cast<int>(client_socket));
 
                 if (client && client_status_cb) client_status_cb(client, true);
-            }
-            /*
-                        // Initialize the client context
-                        clientContext->clientSocket = clientSocket;
-                        ZeroMemory(&clientContext->overlapped, sizeof(OVERLAPPED));
 
-                        // Associate the client socket with the completion port
-                        if (!CreateIoCompletionPort((HANDLE)clientSocket, completionPort,
-               (ULONG_PTR)clientSocket, 0)) { std::cerr << "CreateIoCompletionPort failed" <<
-               std::endl; closesocket(clientSocket); clientContext->clientSocket = INVALID_SOCKET;
-                        continue;
+                DWORD flags = 0;
+
+                int result = WSARecv(
+                    client_socket,
+                    &client->wsa_receive_buf_,
+                    1,
+                    NULL,
+                    &flags,
+                    &client->wsa_overlapped_,
+                    [](DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags) {
+                        UNUSED(dwFlags);
+
+                        SocketClientHandler<SocketT>* rc = CONTAINING_RECORD(
+                            lpOverlapped, SocketClientHandler<SocketT>, wsa_overlapped_);
+                        auto client = rc->server_->GetClient(rc->client_socket_);
+
+                        // Handle completion
+                        if (dwError != 0)
+                        {
+                            client->connected_ = false;
+                            client->server_->RemoveClient(client->client_socket_);
+                            if (client->server_->client_status_cb_)
+                                client->server_->client_status_cb_(client, false);
                         }
+                        else
+                        {
+                            if (client->server_->server_data_received_cb_)
+                            {
+                                std::vector<uint8_t> data(
+                                    client->wsa_receive_buf_.buf,
+                                    client->wsa_receive_buf_.buf + cbTransferred);
+                                client->server_->server_data_received_cb_(client, data);
+                            }
+                        }
+                    });
 
-                        // Start an asynchronous receive operation for this client
-                        DWORD flags = 0;
-                        WSARecv(clientContext->clientSocket, &clientContext->recvBuffer, 1,
-               &clientContext->recvBytes, &flags, &clientContext->overlapped, NULL);
-            */
+                if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
+                {
+                    RemoveClient(static_cast<int>(client_socket));
+                }
+            }
         }
-    }
-
-    void DataProcessingRoutine(ServerDataReceivedCb server_data_received_cb)
-    {
     }
 #endif
 
@@ -326,12 +353,10 @@ private:
     std::atomic_bool stopped_;
     std::map<int, SocketClientHandlerPtr<SocketT>> clients_;
     std::mutex clients_mtx_;
-#ifdef __linux__
     std::thread worker_thread_;
-#else
-    std::thread connection_thread_;
-    std::thread data_processing_thread_;
-#endif
+
+    ClientStatusCb client_status_cb_;
+    ServerDataReceivedCb server_data_received_cb_;
 };
 
 } // namespace sercli

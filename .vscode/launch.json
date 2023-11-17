@@ -15,6 +15,16 @@
         },
 
         {
+            "name": "ServerTest Win",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/component/interactive/Debug/ServerTest.exe",
+            "args": ["127.0.0.1", "12345"],
+            "cwd": "${workspaceFolder}/build/Debug",
+            "externalConsole": true
+        },
+
+        {
             "name": "ClientTest",
             "type": "cppdbg",
             "request": "launch",
