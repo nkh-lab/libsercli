@@ -45,6 +45,7 @@ public:
     {
 #ifdef __linux__
 #else
+        receive_buffer_.reserve(kDataBufferSize);
         receive_buffer_.resize(kDataBufferSize);
         wsa_receive_buf_.buf = reinterpret_cast<CHAR*>(receive_buffer_.data());
         wsa_receive_buf_.len = static_cast<ULONG>(receive_buffer_.size());
@@ -217,10 +218,9 @@ private:
                 {
                     // Handle data from existing clients
                     client_socket = events[i].data.fd;
-                    constexpr size_t RECEIVER_BUFFER_SIZE = 1024; // TODO: configurable?
-                    std::vector<uint8_t> buffer(RECEIVER_BUFFER_SIZE);
+                    std::vector<uint8_t> buffer(kDataBufferSize);
 
-                    int bytes_read = read(client_socket, buffer.data(), RECEIVER_BUFFER_SIZE);
+                    int bytes_read = read(client_socket, buffer.data(), buffer.size());
                     if (bytes_read == 0)
                     {
                         // Client disconnected
@@ -314,9 +314,9 @@ private:
         {
             if (server->server_data_received_cb_)
             {
-                std::vector<uint8_t> data(
-                    client->wsa_receive_buf_.buf, client->wsa_receive_buf_.buf + received_bytes);
-                server->server_data_received_cb_(client, data);
+                client->receive_buffer_.resize(received_bytes);
+                server->server_data_received_cb_(client, client->receive_buffer_);
+                client->receive_buffer_.resize(kDataBufferSize);
             }
 
             // next receiving
