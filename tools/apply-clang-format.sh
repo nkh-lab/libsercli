@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright (C) 2022 https://github.com/nkh-lab
+# Copyright (C) 2023 https://github.com/nkh-lab
 #
 # This is free software. You can redistribute it and/or
 # modify it under the terms of the GNU General Public License

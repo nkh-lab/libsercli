@@ -1,3 +1,16 @@
+## Intro
+Cross-platform C++ library for server-client communication, that provides an easy and user friendly interface for its use.
+
+**Supports:**
+
+|Socket|Linux|Windows|
+|------|-----|-------|
+|UNIX  |  +  |       |
+|Inet  |  +  |   +   |
+
+## CI Status
+[![CI](https://github.com/nkh-lab/libsercli/actions/workflows/ci.yml/badge.svg)](https://github.com/nkh-lab/libsercli/actions/workflows/ci.yml)
+
 ## How to build
 ### Linux
 #### Debug and Tests
