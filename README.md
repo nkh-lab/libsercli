@@ -11,6 +11,8 @@ Cross-platform C++ library for server-client communication, that provides an eas
 ## CI Status
 [![CI](https://github.com/nkh-lab/libsercli/actions/workflows/ci.yml/badge.svg)](https://github.com/nkh-lab/libsercli/actions/workflows/ci.yml)
 
+Ubuntu | Windows
+
 ## How to build
 ### Linux
 #### Debug and Tests
