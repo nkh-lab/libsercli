@@ -37,8 +37,8 @@ template <class SocketT>
 class SocketClientHandler : public IClientHandler
 {
 public:
-    SocketClientHandler(int client_socket, SocketServer<SocketT>* server)
-        : client_socket_{client_socket}
+    SocketClientHandler(SOCKET client_socket, SocketServer<SocketT>* server)
+        : socket_{client_socket}
         , server_{server}
         , id_{std::to_string(client_socket)}
         , connected_{true}
@@ -49,6 +49,8 @@ public:
         receive_buffer_.resize(kDataBufferSize);
         wsa_receive_buf_.buf = reinterpret_cast<CHAR*>(receive_buffer_.data());
         wsa_receive_buf_.len = static_cast<ULONG>(receive_buffer_.size());
+        wsa_receive_flags_ = 0;
+        wsa_overlapped_ = {};
 #endif
     }
     ~SocketClientHandler() = default;
@@ -64,7 +66,7 @@ public:
         ssize_t bytes_written = write(client_socket_, data.data(), data.size());
 #else
         ssize_t bytes_written = send(
-            client_socket_, reinterpret_cast<const char*>(data.data()), static_cast<int>(data.size()), 0);
+            socket_, reinterpret_cast<const char*>(data.data()), static_cast<int>(data.size()), 0);
 #endif
         if (bytes_written == -1 || bytes_written != static_cast<ssize_t>(data.size())) return false;
 
@@ -74,11 +76,16 @@ public:
 private:
 #ifdef __linux__
 #else
+    //
+    // WSAOVERLAPPED must be the first field because it is used in dereferencing
+    // to access all members (for example, in a completition routine callback)
+    //
     WSAOVERLAPPED wsa_overlapped_;
     WSABUF wsa_receive_buf_;
+    DWORD wsa_receive_flags_;
     std::vector<uint8_t> receive_buffer_;
 #endif
-    const int client_socket_;
+    const SOCKET socket_;
     SocketServer<SocketT>* server_;
     const std::string id_;
     std::atomic_bool connected_;
@@ -95,7 +102,7 @@ class SocketServer : public IServer
 public:
     template <class... Args>
     SocketServer(const Args&... args)
-        : server_socket_{args...}
+        : smart_socket_{args...}
         , stopped_{true}
     {
     }
@@ -106,9 +113,9 @@ public:
     {
         bool ret = false;
 
-        server_socket_.Start();
+        smart_socket_.Start();
 
-        if (server_socket_.GetRawSocket() != kSocketError)
+        if (smart_socket_.GetRawSocket() != kSocketError)
         {
             stopped_ = false;
             worker_thread_ =
@@ -125,7 +132,7 @@ public:
 
 #ifdef __linux__
 #else
-        server_socket_.ForceClose();
+        smart_socket_.ForceClose();
 #endif
         if (worker_thread_.joinable()) worker_thread_.join();
     }
@@ -145,14 +152,14 @@ public:
 
     IClientHandlerPtr GetClient(const std::string& id) override
     {
-        int id_int;
+        SOCKET socket;
         IClientHandlerPtr client = nullptr;
 
         try
         {
-            id_int = static_cast<int>(std::stoi(id));
+            socket = static_cast<int>(std::stoi(id));
 
-            client = GetClient(id_int);
+            client = GetClient(socket);
         }
         catch (...)
         {
@@ -265,27 +272,43 @@ private:
 
         while (!stopped_)
         {
-            SOCKET client_socket = accept(server_socket_.GetRawSocket(), nullptr, nullptr);
+            SOCKET client_socket = accept(smart_socket_.GetRawSocket(), nullptr, nullptr);
             if (client_socket != kSocketError)
             {
                 auto client = AddClient(static_cast<int>(client_socket));
 
                 if (client && client_status_cb) client_status_cb(client, true);
 
-                DWORD flags = 0;
+                //
+                // int WSAAPI WSARecv(
+                //     [in]      SOCKET                             s,
+                //     [in, out] LPWSABUF                           lpBuffers,
+                //     [in]      DWORD                              dwBufferCount,
+                //     [out]     LPDWORD                            lpNumberOfBytesRecvd,
+                //     [in, out] LPDWORD                            lpFlags,
+                //     [in]      LPWSAOVERLAPPED                    lpOverlapped,
+                //     [in]      LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+                // );
+                //
+                SOCKET wsa_recv_sock = client_socket;
+                LPWSABUF wsa_recv_buf = &client->wsa_receive_buf_;
+                LPDWORD wsa_recv_flags = &client->wsa_receive_flags_;
+                LPWSAOVERLAPPED wsa_recv_overlapped = &client->wsa_overlapped_;
 
                 int result = WSARecv(
-                    client_socket,
-                    &client->wsa_receive_buf_,
+                    wsa_recv_sock,
+                    wsa_recv_buf,
                     1,
-                    NULL,
-                    &flags,
-                    &client->wsa_overlapped_,
+                    nullptr,
+                    wsa_recv_flags,
+                    wsa_recv_overlapped,
                     &SocketServer<SocketT>::WsaReceiveCompletitionRoutine);
 
                 if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
                 {
+                    client->connected_ = false;
                     RemoveClient(static_cast<int>(client_socket));
+                    if (client_status_cb_) client_status_cb_(client, false);
                 }
             }
         }
@@ -297,50 +320,63 @@ private:
         LPWSAOVERLAPPED overlapped,
         DWORD flags)
     {
+        UNUSED(flags);
+
         SocketClientHandler<SocketT>* rc =
             CONTAINING_RECORD(overlapped, SocketClientHandler<SocketT>, wsa_overlapped_);
-        auto client = rc->server_->GetClient(rc->client_socket_);
-        auto& client_socket = rc->client_socket_;
+        SOCKET client_socket = rc->socket_;
+
+        auto client = rc->server_->GetClient(rc->socket_);
+        if (!client) return;
         auto& server = client->server_;
 
-        // Handle completion
-        if (error != 0)
+        if (!server->stopped_ && client->connected_)
         {
-            client->connected_ = false;
-            server->RemoveClient(client_socket);
-            if (server->client_status_cb_) server->client_status_cb_(client, false);
-        }
-        else
-        {
-            if (server->server_data_received_cb_)
+            if (error != 0)
             {
-                client->receive_buffer_.resize(received_bytes);
-                server->server_data_received_cb_(client, client->receive_buffer_);
-                client->receive_buffer_.resize(kDataBufferSize);
+                client->connected_ = false;
+                server->RemoveClient(client_socket);
+                if (server->client_status_cb_) server->client_status_cb_(client, false);
             }
-
-            // next receiving
-            int result = WSARecv(
-                client_socket,
-                &client->wsa_receive_buf_,
-                1,
-                NULL,
-                &flags,
-                &client->wsa_overlapped_,
-                &SocketServer<SocketT>::WsaReceiveCompletitionRoutine);
-
-            if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
+            else
             {
-                server->RemoveClient(static_cast<int>(client_socket));
+                if (server->server_data_received_cb_)
+                {
+                    client->receive_buffer_.resize(received_bytes);
+                    server->server_data_received_cb_(client, client->receive_buffer_);
+                    client->receive_buffer_.resize(kDataBufferSize);
+                }
+
+                // next receiving
+                SOCKET wsa_recv_sock = client_socket;
+                LPWSABUF wsa_recv_buf = &client->wsa_receive_buf_;
+                LPDWORD wsa_recv_flags = &client->wsa_receive_flags_;
+                LPWSAOVERLAPPED wsa_recv_overlapped = &client->wsa_overlapped_;
+
+                int result = WSARecv(
+                    wsa_recv_sock,
+                    wsa_recv_buf,
+                    1,
+                    nullptr,
+                    wsa_recv_flags,
+                    wsa_recv_overlapped,
+                    &SocketServer<SocketT>::WsaReceiveCompletitionRoutine);
+
+                if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
+                {
+                    client->connected_ = false;
+                    server->RemoveClient(static_cast<int>(client_socket));
+                    if (server->client_status_cb_) server->client_status_cb_(client, false);
+                }
             }
         }
     }
 #endif
-    SocketClientHandlerPtr<SocketT> GetClient(int id)
+    SocketClientHandlerPtr<SocketT> GetClient(SOCKET socket)
     {
         std::lock_guard<std::mutex> lk(clients_mtx_);
 
-        auto it = clients_.find(id);
+        auto it = clients_.find(socket);
 
         if (it != clients_.end())
             return (*it).second;
@@ -348,13 +384,13 @@ private:
             return nullptr;
     }
 
-    SocketClientHandlerPtr<SocketT> AddClient(int id)
+    SocketClientHandlerPtr<SocketT> AddClient(SOCKET socket)
     {
         std::lock_guard<std::mutex> lk(clients_mtx_);
 
-        auto client = std::make_shared<SocketClientHandler<SocketT>>(id, this);
+        auto client = std::make_shared<SocketClientHandler<SocketT>>(socket, this);
 
-        auto emplace_res = clients_.emplace(id, client);
+        auto emplace_res = clients_.emplace(socket, client);
 
         if (emplace_res.second)
             return client;
@@ -362,20 +398,22 @@ private:
             return nullptr;
     }
 
-    void RemoveClient(int id)
+    void RemoveClient(SOCKET socket)
     {
         std::lock_guard<std::mutex> lk(clients_mtx_);
-        clients_.erase(id);
+        clients_.erase(socket);
     }
 
-    SmartSocket<Server, SocketT> server_socket_;
+    SmartSocket<Server, SocketT> smart_socket_;
     std::atomic_bool stopped_;
-    std::map<int, SocketClientHandlerPtr<SocketT>> clients_;
+    std::map<SOCKET, SocketClientHandlerPtr<SocketT>> clients_;
     std::mutex clients_mtx_;
     std::thread worker_thread_;
-
+#ifdef __linux__
+#else
     ClientStatusCb client_status_cb_;
     ServerDataReceivedCb server_data_received_cb_;
+#endif
 };
 
 } // namespace sercli

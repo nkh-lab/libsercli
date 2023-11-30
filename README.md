@@ -28,7 +28,7 @@ Client with ID: 7 diconnected
 ```
 Inet connection
 ```
-./HandshakeTest "127.0.0.1" 12345
+./HandshakeTest 127.0.0.1 12345
 Hello World from HandshakeTest!
 Client with ID: 7 connected
 Client received data: Hello Client!
@@ -67,7 +67,7 @@ q:
 ```
 Inet connection
 ```
-./ServerTest "127.0.0.1" 12345
+./ServerTest 127.0.0.1 12345
 Hello World from SocketServerTest!
 Client with ID: 5 connected
 Total clients: 1
@@ -83,7 +83,7 @@ Sending Done!
 q:
 ```
 ```
-./ClientTest "127.0.0.1" 12345
+./ClientTest 127.0.0.1 12345
 Hello World from SocketClientTest!
 s:hi
 Sending...

@@ -35,9 +35,18 @@ class SocketClient : public IClient
 public:
     template <class... Args>
     SocketClient(const Args&... args)
-        : client_socket_{args...}
+        : smart_socket_{args...}
         , disconnected_{true}
     {
+#ifdef __linux__
+#else
+        receive_buffer_.reserve(kDataBufferSize);
+        receive_buffer_.resize(kDataBufferSize);
+        wsa_receive_buf_.buf = reinterpret_cast<CHAR*>(receive_buffer_.data());
+        wsa_receive_buf_.len = static_cast<ULONG>(receive_buffer_.size());
+        wsa_receive_flags_ = 0;
+        wsa_overlapped_ = {};
+#endif
     }
 
     ~SocketClient() { Disconnect(); }
@@ -46,9 +55,9 @@ public:
     {
         bool ret = false;
 
-        client_socket_.Start();
+        smart_socket_.Start();
 
-        if (client_socket_.GetRawSocket() != kSocketError)
+        if (smart_socket_.GetRawSocket() != kSocketError)
         {
             disconnected_ = false;
             worker_thread_ =
@@ -64,7 +73,7 @@ public:
         disconnected_ = true;
 #ifdef __linux__
 #else
-        client_socket_.ForceClose();
+        smart_socket_.ForceClose();
 #endif
         if (worker_thread_.joinable()) worker_thread_.join();
     }
@@ -77,7 +86,7 @@ public:
         ssize_t bytes_written = write(client_socket_.GetRawSocket(), data.data(), data.size());
 #else
         ssize_t bytes_written = send(
-            client_socket_.GetRawSocket(),
+            smart_socket_.GetRawSocket(),
             reinterpret_cast<const char*>(data.data()),
             static_cast<int>(data.size()),
             0);
@@ -161,59 +170,60 @@ private:
 #else
     void Routine(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb)
     {
-        WSAOVERLAPPED overlapped = {};
-        overlapped.hEvent = WSACreateEvent();
+        LPWSAOVERLAPPED wsa_recv_overlapped = &wsa_overlapped_;
+        wsa_recv_overlapped->hEvent = WSACreateEvent();
 
-        if (overlapped.hEvent != nullptr)
+        if (wsa_recv_overlapped->hEvent != nullptr)
         {
             while (!disconnected_)
             {
-                SOCKET sock = client_socket_.GetRawSocket();
-                std::vector<uint8_t> buffer(kDataBufferSize);
-                WSABUF wsa_buf;
-                wsa_buf.len = static_cast<ULONG>(buffer.size());
-                wsa_buf.buf = reinterpret_cast<char*>(buffer.data());
-                DWORD flags = 0;
-                DWORD received_bytes = 0;
+                SOCKET wsa_recv_sock = smart_socket_.GetRawSocket();
+                LPWSABUF wsa_recv_buf = &wsa_receive_buf_;
+                LPDWORD wsa_recv_flags = &wsa_receive_flags_;
 
-                if (overlapped.hEvent != nullptr)
+                int result = WSARecv(
+                    wsa_recv_sock, wsa_recv_buf, 1, nullptr, wsa_recv_flags, wsa_recv_overlapped, nullptr);
+
+                if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
                 {
-                    if (WSARecv(sock, &wsa_buf, 1, &received_bytes, &flags, &overlapped, nullptr) ==
-                            SOCKET_ERROR &&
-                        WSAGetLastError() != WSA_IO_PENDING)
+                    if (server_disconnected_cb) server_disconnected_cb();
+                    disconnected_ = true;
+                }
+                else
+                {
+                    if (WSAWaitForMultipleEvents(
+                            1, &wsa_recv_overlapped->hEvent, true, INFINITE, true) != WSA_WAIT_FAILED)
                     {
-                        if (server_disconnected_cb) server_disconnected_cb();
-                        disconnected_ = true;
-                    }
-                    else
-                    {
-                        if (WSAWaitForMultipleEvents(1, &overlapped.hEvent, TRUE, INFINITE, TRUE) !=
-                            WSA_WAIT_FAILED)
+                        DWORD wsa_received_bytes = 0;
+                        if (WSAGetOverlappedResult(
+                                wsa_recv_sock, wsa_recv_overlapped, &wsa_received_bytes, false, wsa_recv_flags))
                         {
-                            if (WSAGetOverlappedResult(
-                                    sock, &overlapped, &received_bytes, FALSE, &flags))
+                            if (wsa_received_bytes > 0)
                             {
-                                if (received_bytes > 0)
+                                if (data_received_cb)
                                 {
-                                    if (data_received_cb)
-                                    {
-                                        buffer.resize(received_bytes);
-                                        data_received_cb(buffer);
-                                    }
+                                    receive_buffer_.resize(wsa_received_bytes);
+                                    data_received_cb(receive_buffer_);
+                                    receive_buffer_.resize(kDataBufferSize);
                                 }
-
-                                WSAResetEvent(overlapped.hEvent);
                             }
+
+                            WSAResetEvent(wsa_recv_overlapped->hEvent);
                         }
                     }
                 }
             }
-            WSACloseEvent(overlapped.hEvent);
+            WSACloseEvent(wsa_recv_overlapped->hEvent);
         }
     }
+
+    WSAOVERLAPPED wsa_overlapped_;
+    WSABUF wsa_receive_buf_;
+    DWORD wsa_receive_flags_;
+    std::vector<uint8_t> receive_buffer_;
 #endif
 
-    SmartSocket<Client, SocketT> client_socket_;
+    SmartSocket<Client, SocketT> smart_socket_;
     std::thread worker_thread_;
     std::atomic_bool disconnected_;
 };
