@@ -83,7 +83,7 @@ public:
         if (disconnected_) return false;
 
 #ifdef __linux__
-        ssize_t bytes_written = write(client_socket_.GetRawSocket(), data.data(), data.size());
+        ssize_t bytes_written = write(smart_socket_.GetRawSocket(), data.data(), data.size());
 #else
         ssize_t bytes_written = send(
             smart_socket_.GetRawSocket(),
@@ -108,9 +108,9 @@ private:
         }
 
         epoll_event client_event;
-        client_event.data.fd = client_socket_.GetRawSocket();
+        client_event.data.fd = smart_socket_.GetRawSocket();
         client_event.events = EPOLLIN;
-        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_socket_.GetRawSocket(), &client_event);
+        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, smart_socket_.GetRawSocket(), &client_event);
         constexpr int MAX_EVENTS = 10; // TODO: why?
         std::vector<epoll_event> events(MAX_EVENTS);
 
@@ -133,13 +133,13 @@ private:
 
             for (int i = 0; i < num_events; ++i)
             {
-                if (events[i].data.fd == client_socket_.GetRawSocket())
+                if (events[i].data.fd == smart_socket_.GetRawSocket())
                 {
                     // Handle data from Server
                     std::vector<uint8_t> buffer(kDataBufferSize);
 
                     int received_bytes =
-                        read(client_socket_.GetRawSocket(), buffer.data(), buffer.size());
+                        read(smart_socket_.GetRawSocket(), buffer.data(), buffer.size());
                     if (received_bytes == 0)
                     {
                         // Server disconnected

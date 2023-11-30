@@ -63,7 +63,7 @@ public:
         if (!connected_) return false;
 
 #ifdef __linux__
-        ssize_t bytes_written = write(client_socket_, data.data(), data.size());
+        ssize_t bytes_written = write(socket_, data.data(), data.size());
 #else
         ssize_t bytes_written = send(
             socket_, reinterpret_cast<const char*>(data.data()), static_cast<int>(data.size()), 0);
@@ -179,10 +179,11 @@ private:
             stopped_ = true;
         }
 
+        SOCKET server_socket = smart_socket_.GetRawSocket();
         epoll_event server_event;
-        server_event.data.fd = server_socket_.GetRawSocket();
+        server_event.data.fd = server_socket;
         server_event.events = EPOLLIN;
-        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_socket_.GetRawSocket(), &server_event);
+        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_socket, &server_event);
         constexpr int MAX_EVENTS = 10; // TODO: why?
         constexpr int STOP_HANDLE_TIMEOUT_MS = 500;
         std::vector<epoll_event> events(MAX_EVENTS);
@@ -208,10 +209,10 @@ private:
             {
                 int client_socket;
 
-                if (events[i].data.fd == server_socket_.GetRawSocket())
+                if (events[i].data.fd == server_socket)
                 {
                     // New client connected
-                    client_socket = accept(server_socket_.GetRawSocket(), nullptr, nullptr);
+                    client_socket = accept(server_socket, nullptr, nullptr);
                     epoll_event client_event;
                     client_event.data.fd = client_socket;
                     client_event.events = EPOLLIN | EPOLLET; // Edge-triggered mode
