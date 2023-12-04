@@ -12,7 +12,7 @@
 #include "SmartSocket.h"
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 
 #ifdef __linux__
 #else
@@ -132,5 +132,5 @@ void SmartSocket<Client, InetSocket>::Close()
     }
 }
 
-} // namespace sercli
+} // namespace libsercli
 } // namespace nkhlab

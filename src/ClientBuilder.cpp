@@ -13,10 +13,10 @@
 
 #include "Macros.h"
 #include "SocketClient.h"
-#include "sercli/ClientBuilder.h"
+#include "libsercli/ClientBuilder.h"
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 
 IClientPtr CreateUnixClient(const char* socket_path)
 {
@@ -33,5 +33,5 @@ IClientPtr CreateInetClient(const char* address, int port)
     return std::make_unique<SocketClient<InetSocket>>(address, port);
 }
 
-} // namespace sercli
+} // namespace libsercli
 } // namespace nkhlab

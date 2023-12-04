@@ -22,7 +22,7 @@
 #endif
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 
 using ServerDisconnectedCb = std::function<void()>;
 using ClientDataReceivedCb = std::function<void(const std::vector<uint8_t>& data)>;
@@ -40,7 +40,7 @@ public:
     virtual bool Send(const std::vector<uint8_t>& data) = 0;
 };
 
-} // namespace sercli
+} // namespace libsercli
 } // namespace nkhlab
 
 #undef DLL_EXPORT

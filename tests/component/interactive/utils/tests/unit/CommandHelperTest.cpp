@@ -13,7 +13,7 @@
 
 #include "CommandHelper.h"
 
-using namespace nkhlab::sercli::tests;
+using namespace nkhlab::libsercli::tests;
 
 TEST(CommandHelperTest, ParseGoodCommands)
 {

@@ -15,10 +15,10 @@
 #include <thread>
 
 #include "CommandHelper.h"
-#include "sercli/ClientBuilder.h"
+#include "libsercli/ClientBuilder.h"
 
-using namespace nkhlab::sercli;
-using namespace nkhlab::sercli::tests;
+using namespace nkhlab::libsercli;
+using namespace nkhlab::libsercli::tests;
 
 void HandleSendCommand(IClient* client, const std::vector<uint8_t>& data, int nums, int delay_ms)
 {
@@ -91,7 +91,7 @@ int main(int argc, char const* argv[])
 {
     std::cout << "Hello World from SocketClientTest!\n";
 
-    nkhlab::sercli::IClientPtr client;
+    nkhlab::libsercli::IClientPtr client;
 
     if (argc < 2)
     {

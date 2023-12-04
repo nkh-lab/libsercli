@@ -12,7 +12,7 @@
 #pragma once
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 
 constexpr size_t kDataBufferSize = 1024;
 

@@ -26,7 +26,7 @@ endif()
 
 option(${PROJECT_NAME}_BUILD_UTESTS     "Build unit tests"          OFF)
 option(${PROJECT_NAME}_BUILD_CTESTS     "Build component tests"     OFF)
-option(${PROJECT_NAME}_BUILD_PORTABLE   "Build portable binaries"   OFF)
+option(${PROJECT_NAME}_BUILD_EXAMPLES   "Build examples"            OFF)
 
 # Interface Library
 
@@ -52,3 +52,7 @@ target_link_libraries(${PROJECT_NAME}
     )
 
 add_subdirectory(tests)
+
+if(${PROJECT_NAME}_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()

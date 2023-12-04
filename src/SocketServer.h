@@ -23,12 +23,12 @@
 #include <thread>
 
 #include "Constants.h"
-#include "sercli/IServer.h"
+#include "libsercli/IServer.h"
 
 #include "SmartSocket.h"
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 
 template <class SocketT>
 class SocketServer;
@@ -55,9 +55,15 @@ public:
     }
     ~SocketClientHandler() = default;
 
-    const std::string& GetId() override { return id_; }
+    const std::string& GetId() override
+    {
+        return id_;
+    }
 
-    bool IsConnected() override { return connected_; }
+    bool IsConnected() override
+    {
+        return connected_;
+    }
     bool Send(const std::vector<uint8_t>& data) override
     {
         if (!connected_) return false;
@@ -417,5 +423,5 @@ private:
 #endif
 };
 
-} // namespace sercli
+} // namespace libsercli
 } // namespace nkhlab

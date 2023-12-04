@@ -13,6 +13,30 @@ Cross-platform C++ library for server-client communication, that provides an eas
 
 Ubuntu | Windows
 
+## Example of usage
+
+Below is an example of using libsercli on the server side:
+```
+#include "libsercli/ServerBuilder.h"
+
+using namespace nkhlab::libsercli;
+...
+auto server = CreateInetServer("127.0.0.1", 12345); // or CreateUnixServer("/var/my_sock")
+
+auto client_status_cb = [](IClientHandlerPtr client, bool connected) {
+    if (connected) // Client connected
+    {
+        client->Send(data_to_send); // send data to Client
+    }
+};
+
+auto server_data_received_cb = [](IClientHandlerPtr client, const std::vector<uint8_t>& data) {
+    // Server received data from Client
+};
+
+server->Start(client_status_cb, server_data_received_cb);
+```
+
 ## How to build
 ### Linux
 #### Debug and Tests

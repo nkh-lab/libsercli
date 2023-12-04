@@ -26,7 +26,7 @@
 #include <string>
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 
 #ifdef __linux__
 using SOCKET = int;
@@ -166,5 +166,5 @@ private:
     bool started_;
 };
 
-} // namespace sercli
+} // namespace libsercli
 } // namespace nkhlab

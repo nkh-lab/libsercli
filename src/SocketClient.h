@@ -19,13 +19,13 @@
 #include <map>
 #include <thread>
 
-#include "sercli/IClient.h"
+#include "libsercli/IClient.h"
 
 #include "Constants.h"
 #include "SmartSocket.h"
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 
 constexpr int kStopHandleTimeout_ms = 500;
 
@@ -49,7 +49,10 @@ public:
 #endif
     }
 
-    ~SocketClient() { Disconnect(); }
+    ~SocketClient()
+    {
+        Disconnect();
+    }
 
     bool Connect(ServerDisconnectedCb server_disconnected_cb, ClientDataReceivedCb data_received_cb) override
     {
@@ -228,5 +231,5 @@ private:
     std::atomic_bool disconnected_;
 };
 
-} // namespace sercli
+} // namespace libsercli
 } // namespace nkhlab

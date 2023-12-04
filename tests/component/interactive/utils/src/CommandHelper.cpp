@@ -16,7 +16,7 @@
 using namespace nkhlab::cpputils;
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 namespace tests {
 
 bool CommandHelper::ParseCommand(
@@ -120,5 +120,5 @@ bool CommandHelper::ParseArgument(const std::string& in, std::string& arg, int& 
 }
 
 } // namespace tests
-} // namespace sercli
+} // namespace libsercli
 } // namespace nkhlab

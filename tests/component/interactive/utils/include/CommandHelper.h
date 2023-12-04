@@ -15,7 +15,7 @@
 #include <string>
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 namespace tests {
 
 //
@@ -39,5 +39,5 @@ private:
 };
 
 } // namespace tests
-} // namespace sercli
+} // namespace libsercli
 } // namespace nkhlab

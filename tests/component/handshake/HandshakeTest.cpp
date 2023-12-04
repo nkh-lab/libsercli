@@ -13,10 +13,10 @@
 #include <iostream>
 #include <thread>
 
-#include "sercli/ClientBuilder.h"
-#include "sercli/ServerBuilder.h"
+#include "libsercli/ClientBuilder.h"
+#include "libsercli/ServerBuilder.h"
 
-using namespace nkhlab::sercli;
+using namespace nkhlab::libsercli;
 using namespace std::chrono_literals;
 
 constexpr char kHandshakeRequest[] = "Hello Client!";
@@ -28,8 +28,8 @@ int main(int argc, char const* argv[])
     std::mutex cv_m;
     bool cv_ready = false;
     int cv_data = EXIT_FAILURE;
-    nkhlab::sercli::IServerPtr server;
-    nkhlab::sercli::IClientPtr client;
+    nkhlab::libsercli::IServerPtr server;
+    nkhlab::libsercli::IClientPtr client;
 
     std::cout << "Hello World from HandshakeTest!\n";
 

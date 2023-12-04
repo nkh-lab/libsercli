@@ -23,7 +23,7 @@
 #endif
 
 namespace nkhlab {
-namespace sercli {
+namespace libsercli {
 
 class IClientHandler;
 using IClientHandlerPtr = std::shared_ptr<IClientHandler>;
@@ -55,7 +55,7 @@ public:
     virtual IClientHandlerPtr GetClient(const std::string& id) = 0;
 };
 
-} // namespace sercli
+} // namespace libsercli
 } // namespace nkhlab
 
 #undef DLL_EXPORT
